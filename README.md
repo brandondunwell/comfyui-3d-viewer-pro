@@ -28,7 +28,7 @@ Generate 6 distinct feature maps from your 3D view in a single execution:
 - Frame count, pitch, FOV, and render mode customization.
 
 ### 🛠️ Technical Excellence
-- **Zero-Latency Auto-Load** - Upload a model and it instantly appears in the viewport—no "Queue Prompt" required!
+- **Zero-Latency Auto-Load** - Upload a model run the node once and it loads in the viewer instantly, you can then select which model to choose from the drop down list.
 - **Pure Output Renders** - Automatically forces "Flat Base" lighting during render to guarantee clean, shadow-free feature maps for AI conditioning.
 - **RGBA Transparency** - Full support for transparent background renders with native Alpha channels.
 - **OS Scaling Fix** - Built-in bypass for Windows DPI scaling ensures your 1024x1024 render is *exactly* 1024x1024 pixels.
