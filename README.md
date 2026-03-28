@@ -1,6 +1,5 @@
 # 🎮 ComfyUI-3D-Viewer-Pro
 
-![3D Viewer Pro Hero](file:///C:/Users/Brandon/.gemini/antigravity/brain/c955971d-f0f9-407e-b723-52ff8067150f/comfyui_3d_viewer_pro_hero_1774710096644.png)
 
 A professional-grade, high-performance 3D model viewer and multi-pass rendering engine for **ComfyUI**. Built with **Three.js**, this extension provides a seamless bridge between 3D assets and AI workflows (ControlNet, IP-Adapter, Stable Diffusion).
 
@@ -69,6 +68,8 @@ ComfyUI/input/3d/
 Alternately, you can:
 - Use the **📂 Upload 3D Model** button directly on the node.
 - Provide an **absolute file path** via the `custom_path` input field.
+
+-*NOTE* - YOU NEED TO RUN THE NODE ONCE AFTER YOU LOAD A 3D MODEL USING THE UPLOAD 3D MODEL BUTTON - AFTER THAT YOU CAN JUST SELECT THE MODELS FROM THE DROP DOWN LIST
 
 ## 📜 Credits & License
 - Built with [Three.js](https://threejs.org/)
