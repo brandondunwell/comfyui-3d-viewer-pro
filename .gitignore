@@ -1,0 +1,19 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Project specific
+input/3d/*
+!input/3d/.gitkeep
+temp/*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

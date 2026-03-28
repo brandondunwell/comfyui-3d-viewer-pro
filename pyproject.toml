@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-3d-viewer-pro"
+description = "A full-featured 3D model viewer and multi-pass renderer for ComfyUI. Load, view, and render GLB/GLTF/OBJ/STL/FBX models with interactive orbit controls, multiple render passes (color, depth, normal, wireframe, AO), lighting presets, animation playback, and turntable rendering."
+version = "1.0.0"
+license = "MIT"
+requires-python = ">=3.9"
+
+[project.urls]
+Repository = "https://github.com/your-username/comfyui-3d-viewer-pro"
+
+[tool.comfy]
+PublisherId = "viewer3d-pro"
+DisplayName = "3D Viewer Pro"
+Icon = "https://raw.githubusercontent.com/your-username/comfyui-3d-viewer-pro/main/icon.png"
