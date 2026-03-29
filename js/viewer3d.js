@@ -8,18 +8,43 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
+// ── GLOBAL BROADCAST HELPERS ────────────────────────────────────────────────
+function broadcastResolutionSync(w, h) {
+    if (typeof app === "undefined" || !app.graph) return;
+    
+    // Find all nodes on the canvas of type "Turntable3DPro"
+    const turntableNodes = app.graph._nodes.filter(n => n.type === "Turntable3DPro");
+    if (turntableNodes.length > 0) {
+        console.log(`[3D Viewer Pro] Broadcasting resolution sync (${w}x${h}) to ${turntableNodes.length} turntable nodes...`);
+        for (const tn of turntableNodes) {
+            const wConfig = tn.widgets.find(wg => wg.name === "width" || wg.name === "width (INT)");
+            const hConfig = tn.widgets.find(wg => wg.name === "height" || wg.name === "height (INT)");
+            if (wConfig) { wConfig.value = w; if (wConfig.callback) wConfig.callback(w); }
+            if (hConfig) { hConfig.value = h; if (hConfig.callback) hConfig.callback(h); }
+            if (tn.setDirtyCanvas) tn.setDirtyCanvas(true, true);
+        }
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  CSS — injected inline to avoid file-serving issues
 // ═══════════════════════════════════════════════════════════════════════════
 const VIEWER_CSS = `
 .v3d-container {
     position: relative;
-    width: 100%;
+    width: calc(100% - 20px);
+    margin: 5px auto 15px auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     background: #0d1117;
-    border-radius: 6px;
+    border-radius: 8px;
     overflow: hidden;
+    box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    border: 1px solid rgba(48,54,61,0.6);
+    border: 1px solid rgba(88,166,255,0.1);
 }
 .v3d-canvas-wrap {
     position: relative;
@@ -837,10 +862,27 @@ function createViewerWidget(node) {
 
         const outW = parseInt(wConfig ? wConfig.value : 512) || 512;
         const outH = parseInt(hConfig ? hConfig.value : 512) || 512;
-        
+
+        // 2. Dynamic Layout Logic: Find where the last widget ends to calculate available "air"
+        let widgetsHeight = 50; 
+        if (node.widgets) {
+            for (const w of node.widgets) {
+                if (w.type === "customWidget") continue;
+                const y = w.last_y || 0;
+                const h = (w.computeSize ? w.computeSize()[1] : 28) || 28;
+                widgetsHeight = Math.max(widgetsHeight, y + h + 15);
+            }
+        }
+
         const nodeW = Math.max(200, node.size[0] - 40);
-        const nodeH = Math.max(200, node.size[1] - 150);
+        const nodeH = Math.max(200, node.size[1] - widgetsHeight - 35); 
         
+        // Sync container height to fill the available node space for flex centering
+        if (node._v3dContainer) {
+            node._v3dContainer.style.height = nodeH + 'px';
+            node._v3dContainer.style.marginTop = '10px';
+        }
+
         if (outW !== lastW || outH !== lastH || nodeW !== lastNodeW || nodeH !== lastNodeH) {
             lastW = outW; lastH = outH; lastNodeW = nodeW; lastNodeH = nodeH;
             
@@ -848,17 +890,17 @@ function createViewerWidget(node) {
             let visualW = nodeW;
             let visualH = nodeW / targetAspect;
             
+            // If the calculated height is too tall for the node space, shrink both dimensions
             if (visualH > nodeH) {
-                // Constrained by height
                 visualH = nodeH;
                 visualW = nodeH * targetAspect;
             }
             
             const wrap = node._v3dContainer.querySelector('.v3d-canvas-wrap');
             if (wrap) {
-                wrap.style.width = visualW + 'px';
-                wrap.style.height = visualH + 'px';
-                wrap.style.margin = "0 auto"; // Letterbox center it
+                wrap.style.width = Math.floor(visualW) + 'px';
+                wrap.style.height = Math.floor(visualH) + 'px';
+                // wrap.style.margin = "0 auto"; // Handled by Flexbox centering now
                 node._v3dViewer.resize(visualW, visualH);
             }
         }
@@ -911,6 +953,16 @@ function createViewerWidget(node) {
         if (node._v3dViewer) {
             node._v3dViewer.scene.background = new THREE.Color('#1a1a2e');
             node._v3dViewer.bgTexture = null;
+            
+            // Reset resolution widgets to default 1024
+            const wConfig = node.widgets.find(wg => wg.name === "width" || wg.name === "width (INT)");
+            const hConfig = node.widgets.find(wg => wg.name === "height" || wg.name === "height (INT)");
+            if (wConfig) { wConfig.value = 1024; if (wConfig.callback) wConfig.callback(1024); }
+            if (hConfig) { hConfig.value = 1024; if (hConfig.callback) hConfig.callback(1024); }
+            
+            // --- Broadcast to all Turntable nodes ---
+            broadcastResolutionSync(1024, 1024);
+            // ----------------------------------------
         }
     };
     container.querySelector('[data-action="camera"]').onchange = (e) => {
@@ -981,11 +1033,22 @@ function createViewerWidget(node) {
             const img = new Image();
             img.onload = () => {
                 const w = img.naturalWidth; const h = img.naturalHeight;
-                // Auto-configure node widget dimensions
-                const wConfig = node.widgets.find(wg => wg.name === "width");
-                const hConfig = node.widgets.find(wg => wg.name === "height");
-                if (wConfig) { wConfig.value = w; if (wConfig.callback) wConfig.callback(); }
-                if (hConfig) { hConfig.value = h; if (hConfig.callback) hConfig.callback(); }
+                // Auto-configure node widget dimensions (sync to image aspect ratio)
+                const wConfig = node.widgets.find(wg => wg.name === "width" || wg.name === "width (INT)");
+                const hConfig = node.widgets.find(wg => wg.name === "height" || wg.name === "height (INT)");
+                
+                if (wConfig) { 
+                    wConfig.value = w; 
+                    if (wConfig.callback) wConfig.callback(w); 
+                }
+                if (hConfig) { 
+                    hConfig.value = h; 
+                    if (hConfig.callback) hConfig.callback(h); 
+                }
+                
+                // --- Broadcast to all Turntable nodes ---
+                broadcastResolutionSync(w, h);
+                // ----------------------------------------
                 
                 if (node._v3dViewer) {
                     const texLoader = new THREE.TextureLoader();
