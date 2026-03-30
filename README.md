@@ -3,6 +3,13 @@
 
 A professional-grade, high-performance 3D model viewer and multi-pass rendering engine for **ComfyUI**. Built with **Three.js**, this extension provides a seamless bridge between 3D assets and AI workflows (ControlNet, IP-Adapter, Stable Diffusion).
 
+### 📦 Supported Formats
+Supports all major 3D industry standards:
+- **GLB / GLTF** (Recommended for performance/shading)
+- **OBJ** (Standard geometry)
+- **FBX** (Complex scenes & animation)
+- **STL** (3D printing/sculpting)
+
 ## ✨ Key Features
 
 ### 🚀 Advanced Viewport
@@ -39,7 +46,7 @@ Generate 6 distinct feature maps from your 3D view in a single execution:
 1. Navigate to your `ComfyUI/custom_nodes/` folder in a terminal.
 2. Run the following command:
 ```bash
-git clone https://github.com/your-username/comfyui-3d-viewer-pro
+git clone https://github.com/brandondunwell/comfyui-3d-viewer-pro
 ```
 
 ### Method 2: Manual Installation
