@@ -1215,11 +1215,13 @@ async function performRenderSequence(request, node) {
     viewer._setupLighting('flat');
 
     // Apply config settings to viewport for rendering
-    if (config.bg_transparent) {
-         viewer.scene.background = null;
-         viewer.renderer.setClearColor(0x000000, 0); // Transparent RGBA buffer
-    } else if (viewer.bgTexture) {
-         viewer.scene.background = viewer.bgTexture;
+    if (!config.is_advanced) {
+        if (config.bg_transparent) {
+             viewer.scene.background = null;
+             viewer.renderer.setClearColor(0x000000, 0); // Transparent RGBA buffer
+        } else if (viewer.bgTexture) {
+             viewer.scene.background = viewer.bgTexture;
+        }
     }
 
     // Temporarily hide UI helpers and Gizmos during render
@@ -1263,9 +1265,43 @@ async function performRenderSequence(request, node) {
             else if (passName === "ao_silhouette") viewer.setRenderMode("ao");
             else if (passName === "mask") {
                 viewer.setRenderMode("mask");
-                // Only force white background if we are NOT operating in pure RGBA transparent mode
-                if (!config.bg_transparent) {
+            }
+            
+            // Advance Render Pro: Apply specific background settings per pass
+            let isPassTransparent = false;
+            if (config.is_advanced) {
+                const passConfig = config.pass_configs && config.pass_configs[passName];
+                if (passName === "mask") {
                     viewer.scene.background = new THREE.Color("#ffffff");
+                    viewer.renderer.setClearColor(0x000000, 1);
+                } else if (passConfig) {
+                    if (passConfig.bg === "Transparent") {
+                        viewer.scene.background = null;
+                        viewer.renderer.setClearColor(0x000000, 0);
+                        isPassTransparent = true;
+                    } else if (passConfig.bg === "Black") {
+                        viewer.scene.background = new THREE.Color("#000000");
+                        viewer.renderer.setClearColor(0x000000, 1);
+                    } else {
+                        // Original
+                        if (viewer.bgTexture) {
+                            viewer.scene.background = viewer.bgTexture;
+                            viewer.renderer.setClearColor(0x000000, 1);
+                        } else if (origBackground) {
+                            viewer.scene.background = origBackground;
+                            viewer.renderer.setClearColor(0x000000, 1);
+                        } else {
+                             viewer.scene.background = new THREE.Color("#1a1a2e"); // Node default background
+                             viewer.renderer.setClearColor(0x000000, 1);
+                        }
+                    }
+                }
+            } else {
+                // Classic mode logic for mask pass
+                if (passName === "mask") {
+                    if (!config.bg_transparent) {
+                        viewer.scene.background = new THREE.Color("#ffffff");
+                    }
                 }
             }
             
@@ -1291,8 +1327,8 @@ async function performRenderSequence(request, node) {
             const result = await resp.json();
             console.log(`[3D Viewer Pro] Pass "${passName}" upload result:`, result);
             
-            // Restore background after mask pass
-            if (passName === "mask") {
+            // Restore background after pass (primarily needed for classic mode mask logic, but doesn't hurt)
+            if (!config.is_advanced && passName === "mask") {
                 if (config.bg_transparent) {
                     viewer.scene.background = null;
                 } else if (viewer.bgTexture) {

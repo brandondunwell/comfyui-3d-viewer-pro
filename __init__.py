@@ -1,5 +1,6 @@
 from .nodes.load_3d_model import LoadAndPreview3DModelPro
 from .nodes.turntable_3d import Turntable3DPro
+from .nodes.advanced_render import AdvancedRenderPro
 
 
 # Import server routes to register API endpoints
@@ -9,11 +10,13 @@ from .server import routes  # noqa: F401
 NODE_CLASS_MAPPINGS = {
     "LoadAndPreview3DModelPro": LoadAndPreview3DModelPro,
     "Turntable3DPro": Turntable3DPro,
+    "AdvancedRenderPro": AdvancedRenderPro,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "LoadAndPreview3DModelPro": "Load & Preview 3D Model Pro",
     "Turntable3DPro": "Turntable 3D Pro",
+    "AdvancedRenderPro": "Advanced Render Pro",
 }
 
 WEB_DIRECTORY = "./js"
