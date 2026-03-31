@@ -768,8 +768,8 @@ function createViewerWidget(node) {
             
             <div class="v3d-toolbar-group" title="Field of View (Lens mm)">
                 <span>🎥</span>
-                <span data-id="fov-val" style="width:20px;text-align:right;">50</span>
-                <input type="range" data-action="fov" min="10" max="150" value="50" style="width:40px;margin-left:5px;">
+                <input type="number" data-id="fov-val" value="50" style="width:40px;text-align:right;background:rgba(255,255,255,0.1);border:1px solid #333;color:white;border-radius:3px;padding:1px;" min="10" max="150"><span>mm</span>
+                <input type="range" data-action="fov" min="10" max="150" value="50" style="width:70px;margin-left:5px;">
             </div>
 
             <select data-action="mode" title="Render Material Pass">
@@ -802,6 +802,8 @@ function createViewerWidget(node) {
                 <option value="flat">Flat Base</option>
                 <option value="rim">Rim Peak</option>
             </select>
+
+            <button data-action="reset-view" title="Reset Transforms & Viewport" style="padding:0 8px;margin-left:5px;">🔄 Reset</button>
 
             <div class="v3d-spacer"></div>
 
@@ -940,15 +942,27 @@ function createViewerWidget(node) {
     container.querySelector('[data-action="mode"]').onchange = (e) => {
         if (node._v3dViewer) node._v3dViewer.setRenderMode(e.target.value);
     };
-    container.querySelector('[data-action="fov"]').oninput = (e) => {
+    const fovNumber = container.querySelector('[data-id="fov-val"]');
+    const fovRange = container.querySelector('[data-action="fov"]');
+
+    const updateFov = (val) => {
+        val = Math.max(10, Math.min(150, parseFloat(val) || 50));
+        fovNumber.value = val;
+        fovRange.value = val;
         if (node._v3dViewer) {
-            const val = parseFloat(e.target.value);
-            container.querySelector('[data-id="fov-val"]').textContent = val;
             node._v3dViewer.camera.setFocalLength(val);
             node._v3dViewer.camera.updateProjectionMatrix();
             if (node.setDirtyCanvas) node.setDirtyCanvas(true);
         }
     };
+
+    fovRange.addEventListener('input', (e) => updateFov(e.target.value));
+    fovNumber.addEventListener('change', (e) => updateFov(e.target.value));
+    fovNumber.addEventListener('input', (e) => {
+        // Only update camera if valid number while typing to prevent stuttering
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val >= 10 && val <= 150) updateFov(val);
+    });
     container.querySelector('[data-action="clear-bg"]').onclick = () => {
         if (node._v3dViewer) {
             node._v3dViewer.scene.background = new THREE.Color('#1a1a2e');
@@ -1023,6 +1037,26 @@ function createViewerWidget(node) {
 
     container.querySelector('[data-action="fit"]').onclick = () => {
         if (node._v3dViewer) node._v3dViewer._zoomToFit();
+    };
+
+    container.querySelector('[data-action="reset-view"]').onclick = () => {
+        const viewer = node._v3dViewer;
+        if (viewer) {
+            if (viewer.model) {
+                viewer.model.position.set(0, 0, 0);
+                viewer.model.rotation.set(0, 0, 0);
+                viewer.model.scale.set(1, 1, 1);
+                viewer.model.updateMatrixWorld(true);
+            }
+            if (viewer.transformControls) {
+                viewer.transformControls.detach();
+                currentGizmoAction = null;
+                updateGizmoBtns();
+            }
+            if (typeof updateFov === 'function') updateFov(50);
+            viewer._zoomToFit();
+            if (node.setDirtyCanvas) node.setDirtyCanvas(true);
+        }
     };
     container.querySelector('[data-action="bg"]').onclick = () => {
         const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
