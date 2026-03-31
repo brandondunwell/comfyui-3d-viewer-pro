@@ -1459,11 +1459,13 @@ async function performTurntableSequence(request, node) {
     const outW = config.width || 1024;
     const outH = config.height || 1024;
     const angleOffsets = config.angle_offsets || [];
-    const pitch = (config.pitch || 20.0) * Math.PI / 180.0;
-    const fov = sourceViewer.camera.getEffectiveFOV ? sourceViewer.camera.getEffectiveFOV() : sourceViewer.camera.fov;
+    const pitch = (config.pitch !== undefined ? config.pitch : 20.0) * Math.PI / 180.0;
     const renderMode = config.render_mode || 'color';
     const bgMode = config.bg_mode || 'Original';
     const startFront = config.start_from_front_view || false;
+    
+    // We fetch fov securely since we stripped it from python payload
+    const fov = sourceViewer.camera.getEffectiveFOV ? sourceViewer.camera.getEffectiveFOV() : sourceViewer.camera.fov;
 
     console.log(`[3D Viewer Pro] Turntable: ${angleOffsets.length} frames at ${outW}x${outH}`);
 
@@ -1507,12 +1509,13 @@ async function performTurntableSequence(request, node) {
     // Camera
     const offCamera = new THREE.PerspectiveCamera(fov, outW / outH, 0.01, 1000);
 
-    // Get model bounding box for orbit center point
+    // Get model bounding box for orbit distance (Original auto-farming math!)
     const box = new THREE.Box3().setFromObject(sourceViewer.model);
     const center = new THREE.Vector3(); box.getCenter(center);
-    
-    // Lock the camera orbit distance to exactly match the active zoom level of the main viewport
-    const dist = sourceViewer.camera.position.distanceTo(sourceViewer.controls.target);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const camFov = fov * (Math.PI / 180);
+    const dist = (maxDim / 2) / Math.tan(camFov / 2) * 1.6;
 
     let startYawRad = 0;
     if (!startFront) {
