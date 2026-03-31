@@ -6,9 +6,8 @@ license = "MIT"
 requires-python = ">=3.9"
 
 [project.urls]
-Repository = "https://github.com/your-username/comfyui-3d-viewer-pro"
+Repository = "https://github.com/brandondunwell/comfyui-3d-viewer-pro"
 
 [tool.comfy]
 PublisherId = "viewer3d-pro"
 DisplayName = "3D Viewer Pro"
-Icon = "https://raw.githubusercontent.com/your-username/comfyui-3d-viewer-pro/main/icon.png"
