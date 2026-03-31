@@ -81,13 +81,22 @@ const VIEWER_CSS = `
 .v3d-toolbar select:hover { border-color: #58a6ff; }
 .v3d-toolbar button {
     background: #21262d; border: 1px solid rgba(139,148,158,0.3); border-radius: 6px;
-    color: #e6edf3; font-size: 13px; width: 28px; height: 26px; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center; padding: 0;
-    transition: all 0.15s ease;
+    color: #e6edf3; font-size: 11px; min-width: 28px; height: 26px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0 6px;
+    transition: all 0.15s ease; white-space: nowrap; gap: 5px; font-weight: 500;
 }
+.v3d-toolbar button.icon-only { padding: 0; width: 28px; }
 .v3d-toolbar button:hover {
     background: #58a6ff; border-color: #58a6ff; color: #0d1117;
     transform: translateY(-1px); box-shadow: 0 2px 5px rgba(88,166,255,0.3);
+}
+.v3d-toolbar input[type="range"] {
+    -webkit-appearance: none; background: rgba(0,0,0,0.4); height: 4px; border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.1); cursor: pointer;
+}
+.v3d-toolbar input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
+    background: #58a6ff; box-shadow: 0 0 4px rgba(88,166,255,0.6); margin-top: -1px;
 }
 .v3d-toolbar .v3d-spacer { flex: 1; }
 .v3d-status {
@@ -762,14 +771,18 @@ function createViewerWidget(node) {
     container.innerHTML = `
         <div class="v3d-toolbar">
             <div class="v3d-toolbar-group">
-                <button data-action="bg" title="Upload Background Image">🖼️ BG</button>
-                <button data-action="clear-bg" title="Remove Background" style="color:#f85149;">✕</button>
+                <button data-action="bg" title="Upload Background Image">
+                    🖼️ BG
+                </button>
+                <button data-action="clear-bg" class="icon-only" title="Remove Background" style="color:#f85149;">
+                    ✕
+                </button>
             </div>
             
-            <div class="v3d-toolbar-group" title="Field of View (Lens mm)">
+            <div class="v3d-toolbar-group" style="padding-left:12px; padding-right:12px;" title="Field of View (Lens mm)">
                 <span>🎥</span>
-                <input type="number" data-id="fov-val" value="50" style="width:40px;text-align:right;background:rgba(255,255,255,0.1);border:1px solid #333;color:white;border-radius:3px;padding:1px;" min="10" max="150"><span>mm</span>
-                <input type="range" data-action="fov" min="10" max="150" value="50" style="width:70px;margin-left:5px;">
+                <input type="number" data-id="fov-val" value="50" style="width:44px;text-align:center;background:rgba(0,0,0,0.4);border:1px solid rgba(139,148,158,0.3);color:#e6edf3;border-radius:4px;padding:2px;font-family:monospace;font-size:11px;outline:none;" min="10" max="150"><span style="color:#8b949e;margin-left:2px;margin-right:4px;">mm</span>
+                <input type="range" data-action="fov" min="10" max="150" value="50" style="width:75px;margin-left:2px;">
             </div>
 
             <select data-action="mode" title="Render Material Pass">
@@ -803,7 +816,9 @@ function createViewerWidget(node) {
                 <option value="rim">Rim Peak</option>
             </select>
 
-            <button data-action="reset-view" title="Reset Transforms & Viewport" style="padding:0 8px;margin-left:5px;">🔄 Reset</button>
+            <button data-action="reset-view" title="Reset Transforms & Viewport" style="margin-left:5px;">
+                🔄 Reset
+            </button>
 
             <div class="v3d-spacer"></div>
 
@@ -817,7 +832,7 @@ function createViewerWidget(node) {
             <div class="v3d-toolbar-group">
                 <button data-action="grid" title="Toggle Floor Grid">⊞</button>
                 <button data-action="axes" title="Toggle World Axes">⊹</button>
-                <button data-action="fit" title="Recenter Camera">⊡</button>
+                <button data-action="fit" title="Recenter Camera (Fit)">🄵</button>
             </div>
         </div>
         <div class="v3d-canvas-wrap" style="width:100%;height:400px;"></div>
