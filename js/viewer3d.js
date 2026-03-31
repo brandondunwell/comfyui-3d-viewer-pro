@@ -756,6 +756,8 @@ app.registerExtension({
                 }
             };
         }
+
+
     }
 });
 
@@ -1456,14 +1458,14 @@ async function performTurntableSequence(request, node) {
     const config = request.config.turntable;
     const outW = config.width || 1024;
     const outH = config.height || 1024;
-    const angles = config.angles || [];
+    const angleOffsets = config.angle_offsets || [];
     const pitch = (config.pitch || 20.0) * Math.PI / 180.0;
-    const fov = config.fov || 50.0;
+    const fov = sourceViewer.camera.getEffectiveFOV ? sourceViewer.camera.getEffectiveFOV() : sourceViewer.camera.fov;
     const renderMode = config.render_mode || 'color';
-    const bgTransparent = config.bg_transparent || false;
-    const bgColor = config.bg_color || '#000000';
+    const bgMode = config.bg_mode || 'Original';
+    const startFront = config.start_from_front_view || false;
 
-    console.log(`[3D Viewer Pro] Turntable: ${angles.length} frames at ${outW}x${outH}`);
+    console.log(`[3D Viewer Pro] Turntable: ${angleOffsets.length} frames at ${outW}x${outH}`);
 
     // Create an offscreen renderer
     const offRenderer = new THREE.WebGLRenderer({
@@ -1480,11 +1482,16 @@ async function performTurntableSequence(request, node) {
     // Clone scene essentials into a separate scene
     const offScene = new THREE.Scene();
 
-    if (bgTransparent) {
+    if (bgMode === 'Transparent') {
         offScene.background = null;
         offRenderer.setClearColor(0x000000, 0);
+    } else if (bgMode === 'Black') {
+        offScene.background = new THREE.Color('#000000');
+    } else if (bgMode === 'White') {
+        offScene.background = new THREE.Color('#ffffff');
     } else {
-        offScene.background = new THREE.Color(bgColor);
+        offScene.background = sourceViewer.scene.background;
+        if (!sourceViewer.scene.background) offRenderer.setClearColor(0x000000, 0);
     }
 
     // Add the existing model directly (shared reference — do NOT dispose)
@@ -1500,13 +1507,19 @@ async function performTurntableSequence(request, node) {
     // Camera
     const offCamera = new THREE.PerspectiveCamera(fov, outW / outH, 0.01, 1000);
 
-    // Get model bounding box for orbit distance
+    // Get model bounding box for orbit center point
     const box = new THREE.Box3().setFromObject(sourceViewer.model);
     const center = new THREE.Vector3(); box.getCenter(center);
-    const size = new THREE.Vector3(); box.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const camFov = fov * (Math.PI / 180);
-    const dist = (maxDim / 2) / Math.tan(camFov / 2) * 1.6;
+    
+    // Lock the camera orbit distance to exactly match the active zoom level of the main viewport
+    const dist = sourceViewer.camera.position.distanceTo(sourceViewer.controls.target);
+
+    let startYawRad = 0;
+    if (!startFront) {
+        const dx = sourceViewer.camera.position.x - sourceViewer.controls.target.x;
+        const dz = sourceViewer.camera.position.z - sourceViewer.controls.target.z;
+        startYawRad = Math.atan2(dx, dz);
+    }
 
     // Apply material override if needed
     const savedMats = new Map();
@@ -1534,9 +1547,9 @@ async function performTurntableSequence(request, node) {
     }
 
     // Render each angle
-    for (let i = 0; i < angles.length; i++) {
-        const yawDeg = angles[i];
-        const yawRad = yawDeg * Math.PI / 180.0;
+    for (let i = 0; i < angleOffsets.length; i++) {
+        const offsetDeg = angleOffsets[i];
+        const yawRad = startYawRad + (offsetDeg * Math.PI / 180.0);
 
         offCamera.position.set(
             center.x + dist * Math.sin(yawRad) * Math.cos(pitch),
@@ -1563,9 +1576,9 @@ async function performTurntableSequence(request, node) {
                     image: dataUrl,
                 })
             });
-            console.log(`[3D Viewer Pro] Turntable frame ${i}/${angles.length} uploaded`);
+            console.log(`[3D Viewer Pro] Turntable frame ${i+1}/${angleOffsets.length} uploaded`);
         } catch (err) {
-            console.error(`[3D Viewer Pro] Turntable frame ${i} upload failed:`, err);
+            console.error(`[3D Viewer Pro] Turntable frame ${i+1} upload failed:`, err);
         }
     }
 

@@ -32,14 +32,11 @@ class Turntable3DPro:
                 "height": ("INT", {"default": 1024, "min": 256, "max": 4096, "step": 64}),
                 "pitch": ("FLOAT", {"default": 20.0, "min": -90.0, "max": 90.0, "step": 1.0,
                                     "tooltip": "Camera elevation angle in degrees"}),
-                "fov": ("FLOAT", {"default": 50.0, "min": 10.0, "max": 120.0, "step": 1.0,
-                                  "tooltip": "Field of view (focal length mm)"}),
-                "start_angle": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 360.0, "step": 1.0,
-                                          "tooltip": "Starting yaw angle in degrees"}),
+                "start_from_front_view": ("BOOLEAN", {"default": False, "tooltip": "Start from 0° (true) or current view (false)"}),
                 "render_mode": (["color", "normal", "depth", "wireframe", "matcap"],
                                {"default": "color", "tooltip": "Material pass to render"}),
-                "bg_color": ("STRING", {"default": "#000000", "tooltip": "Background hex color"}),
-                "bg_transparent": ("BOOLEAN", {"default": False, "tooltip": "Transparent RGBA background"}),
+                "bg_mode": (["Original", "Black", "White", "Transparent"],
+                           {"default": "Original", "tooltip": "Background style"}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -57,17 +54,15 @@ class Turntable3DPro:
         return float("NaN")
 
     def render_turntable(self, model3d, num_frames=16, width=1024, height=1024,
-                         pitch=20.0, fov=50.0, start_angle=0.0,
-                         render_mode="color", bg_color="#000000",
-                         bg_transparent=False, unique_id=None):
+                         pitch=20.0, start_from_front_view=False,
+                         render_mode="color", bg_mode="Original", unique_id=None):
         temp_dir = folder_paths.get_temp_directory()
         os.makedirs(temp_dir, exist_ok=True)
 
-        # Build list of camera angles
-        angles = []
+        # Build list of camera angle offsets
+        angle_offsets = []
         for i in range(num_frames):
-            yaw = start_angle + (360.0 * i / num_frames)
-            angles.append(yaw % 360.0)
+            angle_offsets.append(360.0 * i / num_frames)
 
         turntable_config = {
             "model": {
@@ -79,12 +74,11 @@ class Turntable3DPro:
                 "width": width,
                 "height": height,
                 "num_frames": num_frames,
-                "angles": angles,
+                "angle_offsets": angle_offsets,
                 "pitch": pitch,
-                "fov": fov,
                 "render_mode": render_mode,
-                "bg_color": bg_color,
-                "bg_transparent": bg_transparent,
+                "bg_mode": bg_mode,
+                "start_from_front_view": start_from_front_view,
                 "output_dir": temp_dir,
                 "unique_id": unique_id,
             }
@@ -118,9 +112,10 @@ class Turntable3DPro:
 
         # Load all frames and stack into a batch
         frames = []
+        is_transparent = (bg_mode == "Transparent")
         for i in range(num_frames):
             img_path = os.path.join(temp_dir, f"viewer3d_{unique_id}_turntable_{i:04d}.png")
-            tensor = self._load_image_as_tensor(img_path, width, height, bg_transparent)
+            tensor = self._load_image_as_tensor(img_path, width, height, is_transparent)
             frames.append(tensor)
 
         # Stack into batch [B, H, W, C]
