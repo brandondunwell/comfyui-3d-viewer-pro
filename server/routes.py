@@ -188,6 +188,14 @@ async def upload_model(request):
             return web.json_response({"status": "error", "message": "No file provided"}, status=400)
 
         filename = field.filename
+
+        # Security: strip any directory components from the filename
+        filename = os.path.basename(filename)
+
+        # Reject empty or suspicious filenames
+        if not filename or filename.startswith("."):
+            return web.json_response({"status": "error", "message": "Invalid filename"}, status=400)
+
         ext = os.path.splitext(filename)[1].lower()
 
         if ext not in SUPPORTED_FORMATS:
@@ -197,6 +205,11 @@ async def upload_model(request):
             }, status=400)
 
         save_path = os.path.join(MODELS_3D_DIR, filename)
+
+        # Security: verify final path is still inside MODELS_3D_DIR
+        if not os.path.realpath(save_path).startswith(os.path.realpath(MODELS_3D_DIR)):
+            return web.json_response({"status": "error", "message": "Invalid path"}, status=403)
+
         with open(save_path, "wb") as f:
             while True:
                 chunk = await field.read_chunk()
