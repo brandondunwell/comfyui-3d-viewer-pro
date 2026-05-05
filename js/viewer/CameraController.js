@@ -128,6 +128,39 @@ export class CameraController {
         }
     }
 
+    /**
+     * Snap the viewport to a camera baked into the loaded 3D scene (FBX / GLTF export).
+     * After calling this the user can still orbit freely from the new vantage point.
+     * @param {THREE.Camera} cameraObject - The camera found in the scene graph
+     */
+    applySceneCamera(cameraObject) {
+        // Force-update world matrix in case the model was just added to the scene
+        cameraObject.updateWorldMatrix(true, false);
+
+        const worldPos = new THREE.Vector3();
+        const worldQuat = new THREE.Quaternion();
+        cameraObject.getWorldPosition(worldPos);
+        cameraObject.getWorldQuaternion(worldQuat);
+
+        // Apply position & orientation to the active viewport camera
+        this.camera.position.copy(worldPos);
+        this.camera.quaternion.copy(worldQuat);
+
+        // Copy FOV from the baked camera if both are perspective
+        if (cameraObject.isPerspectiveCamera && this.camera.isPerspectiveCamera) {
+            this.camera.fov = cameraObject.fov;
+            this.camera.updateProjectionMatrix();
+        }
+
+        // Set OrbitControls target a comfortable distance ahead so orbiting
+        // stays intuitive from this new angle instead of jumping back to origin
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(worldQuat);
+        const distToOrigin = worldPos.length();
+        const orbitDist = Math.max(distToOrigin * 0.5, 1.0);
+        this.controls.target.copy(worldPos).addScaledVector(forward, orbitDist);
+        this.controls.update();
+    }
+
     setFOV(fov) {
         if (this.camera.isPerspectiveCamera) {
             this.camera.fov = fov;

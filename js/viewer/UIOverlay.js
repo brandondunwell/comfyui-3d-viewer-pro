@@ -142,6 +142,45 @@ export class UIOverlay {
         if (sel) sel.value = preset;
     }
 
+    /**
+     * Inject scene-baked cameras into the Camera dropdown.
+     * Called after a model is loaded if cameras are found in the scene graph.
+     * @param {string[]} cameraNames - Display names for each scene camera
+     */
+    populateSceneCameras(cameraNames) {
+        const select = this.container.querySelector('#v3d-camera-preset');
+        if (!select || !cameraNames || cameraNames.length === 0) return;
+
+        // Remove any previous scene-camera options first
+        this.clearSceneCameras();
+
+        // Add a visual separator
+        const divider = document.createElement('option');
+        divider.disabled = true;
+        divider.textContent = '── Scene Cameras ──';
+        divider.className = 'v3d-scene-cam-option';
+        select.insertBefore(divider, select.firstChild);
+
+        // Add each camera as a selectable option (inserted in reverse so order is preserved)
+        for (let i = cameraNames.length - 1; i >= 0; i--) {
+            const opt = document.createElement('option');
+            opt.value = `scene_camera_${i}`;
+            opt.textContent = `📷 ${cameraNames[i]}`;
+            opt.className = 'v3d-scene-cam-option';
+            select.insertBefore(opt, select.firstChild);
+        }
+    }
+
+    /**
+     * Remove previously injected scene-camera options from the dropdown.
+     * Called when a new model is loaded that has no embedded cameras.
+     */
+    clearSceneCameras() {
+        const select = this.container.querySelector('#v3d-camera-preset');
+        if (!select) return;
+        select.querySelectorAll('.v3d-scene-cam-option').forEach(el => el.remove());
+    }
+
     updateModelInfo(info) {
         const $ = (id) => this.container.querySelector('#' + id);
         if (info) {

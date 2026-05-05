@@ -247,6 +247,7 @@ class Viewer3D {
         this.fpsFrames = 0;
         this.fpsTime = performance.now();
         this.fps = 0;
+        this.sceneCameras = [];  // cameras baked into the loaded file
     }
 
     async init() {
@@ -518,6 +519,22 @@ class Viewer3D {
         // Extract info
         this._extractModelInfo();
 
+        // Extract cameras baked into the scene (FBX / GLTF from any DCC tool)
+        this.sceneCameras = [];
+        this.model.traverse(child => {
+            if (child.isCamera) {
+                child.updateWorldMatrix(true, false);
+                this.sceneCameras.push({
+                    name: child.name && child.name.trim() ? child.name.trim() : `Camera ${this.sceneCameras.length + 1}`,
+                    object: child,
+                });
+            }
+        });
+        if (this.sceneCameras.length > 0) {
+            console.log(`[3D Viewer Pro] Found ${this.sceneCameras.length} scene camera(s):`,
+                this.sceneCameras.map(c => c.name));
+        }
+
         return loaded;
     }
 
@@ -644,6 +661,38 @@ class Viewer3D {
         if (p) { this.camera.position.set(...p); this.camera.lookAt(center); this.controls.update(); }
     }
 
+    /**
+     * Snap the viewport to a camera baked into the loaded file.
+     * Works with exports from C4D, Blender, Maya, 3ds Max, Houdini, etc.
+     */
+    applySceneCamera(camObj) {
+        camObj.updateWorldMatrix(true, false);
+        const pos = new THREE.Vector3();
+        const quat = new THREE.Quaternion();
+        camObj.getWorldPosition(pos);
+        camObj.getWorldQuaternion(quat);
+
+        this.camera.position.copy(pos);
+        this.camera.quaternion.copy(quat);
+
+        if (camObj.isPerspectiveCamera) {
+            this.camera.fov = camObj.fov;
+            this.camera.updateProjectionMatrix();
+        }
+
+        // Orbit target = center of the model (not a point floating in space)
+        if (this.model) {
+            const box = new THREE.Box3().setFromObject(this.model);
+            const center = new THREE.Vector3(); box.getCenter(center);
+            this.controls.target.copy(center);
+        } else {
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
+            const orbitDist = Math.max(pos.length() * 0.5, 1.0);
+            this.controls.target.copy(pos).addScaledVector(forward, orbitDist);
+        }
+        this.controls.update();
+    }
+
     setBackground(color) { if (this.scene) this.scene.background = new THREE.Color(color); }
 
     resize(w, h) {
@@ -765,6 +814,33 @@ app.registerExtension({
 // ═══════════════════════════════════════════════════════════════════════════
 //  Widget creation and model loading
 // ═══════════════════════════════════════════════════════════════════════════
+
+function populateSceneCamerasUI(container, viewer) {
+    const camSelect = container.querySelector('[data-action="camera"]');
+    if (!camSelect) return;
+
+    // Remove any previously injected scene-camera options
+    camSelect.querySelectorAll('.v3d-scene-cam-option').forEach(el => el.remove());
+
+    if (viewer.sceneCameras && viewer.sceneCameras.length > 0) {
+        // Divider
+        const divider = document.createElement('option');
+        divider.disabled = true;
+        divider.textContent = '── Scene Cameras ──';
+        divider.className = 'v3d-scene-cam-option';
+        camSelect.insertBefore(divider, camSelect.firstChild);
+
+        // One option per baked camera, inserted in reverse to preserve order
+        for (let i = viewer.sceneCameras.length - 1; i >= 0; i--) {
+            const opt = document.createElement('option');
+            opt.value = `scene_camera_${i}`;
+            opt.textContent = `📷 ${viewer.sceneCameras[i].name}`;
+            opt.className = 'v3d-scene-cam-option';
+            camSelect.insertBefore(opt, camSelect.firstChild);
+        }
+    }
+}
+
 function createViewerWidget(node) {
     const container = document.createElement('div');
     container.className = 'v3d-container';
@@ -947,6 +1023,7 @@ function createViewerWidget(node) {
                     if (overlay) overlay.style.display = 'none';
                     node._v3dViewer.currentModelPath = fullPath;
                     node._v3dLoaded = true;
+                    populateSceneCamerasUI(node._v3dContainer, node._v3dViewer);
                 }).catch(err => {
                     console.error('[3D Viewer Pro] Auto-load error:', err);
                     if (overlay) overlay.innerHTML = `<div style="color:#f85149;text-align:center;padding:20px;">❌ Auto-load failed</div>`;
@@ -997,7 +1074,43 @@ function createViewerWidget(node) {
         }
     };
     container.querySelector('[data-action="camera"]').onchange = (e) => {
-        if (node._v3dViewer && e.target.value) node._v3dViewer.setCameraPreset(e.target.value);
+        const val = e.target.value;
+        if (!val) return;
+        const viewer = node._v3dViewer;
+        if (!viewer) return;
+
+        if (val.startsWith('scene_camera_')) {
+            const idx = parseInt(val.replace('scene_camera_', ''), 10);
+            const cam = viewer.sceneCameras?.[idx];
+            if (cam) {
+                viewer.applySceneCamera(cam.object);
+                // Update UI sliders to match the baked camera's focal length
+                if (viewer.camera.getFocalLength) {
+                    const mm = Math.round(viewer.camera.getFocalLength());
+                    fovNumber.value = mm;
+                    fovRange.value = mm;
+                }
+                
+                // Auto-adjust node width to match the baked camera's aspect ratio
+                if (cam.object.isPerspectiveCamera && cam.object.aspect) {
+                    const aspect = cam.object.aspect;
+                    const wConfig = node.widgets.find(wg => wg.name === "width" || wg.name === "width (INT)");
+                    const hConfig = node.widgets.find(wg => wg.name === "height" || wg.name === "height (INT)");
+                    
+                    if (wConfig && hConfig && hConfig.value > 0) {
+                        // Keep current height, adapt width to fit aspect ratio
+                        const newWidth = Math.round(hConfig.value * aspect);
+                        wConfig.value = newWidth;
+                        if (wConfig.callback) wConfig.callback(newWidth);
+                        
+                        // Force a canvas resize in ComfyUI
+                        if (node.setDirtyCanvas) node.setDirtyCanvas(true);
+                    }
+                }
+            }
+        } else {
+            viewer.setCameraPreset(val);
+        }
         e.target.value = '';
     };
     container.querySelector('[data-action="light"]').onchange = (e) => {
@@ -1183,7 +1296,7 @@ async function handleViewerOutput(node, data) {
                 
                 viewer.currentModelPath = data.model.path;
                 viewer._v3dLoaded = true;
-                
+
             } catch (err) {
                 console.error('[3D Viewer Pro] Model load error:', err);
                 loadingEl.innerHTML = `<div style="color:#f85149;text-align:center;padding:20px;">
@@ -1191,7 +1304,11 @@ async function handleViewerOutput(node, data) {
                 return;
             }
         }
-        
+
+        // Always sync scene cameras to the dropdown, regardless of whether the model
+        // was just loaded or was already in the viewport from the auto-load interval.
+        populateSceneCamerasUI(container, viewer);
+
         // Always apply camera preset if asked, but default usually doesn't force override
         if (data.viewer?.camera_preset && data.viewer.camera_preset !== 'default') {
             viewer.setCameraPreset(data.viewer.camera_preset);

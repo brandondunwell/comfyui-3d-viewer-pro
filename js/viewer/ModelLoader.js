@@ -16,6 +16,7 @@ export class ModelLoader {
         this.loadedModel = null;
         this.animations = [];
         this.modelInfo = null;
+        this.sceneCameras = [];
     }
 
     /**
@@ -55,8 +56,16 @@ export class ModelLoader {
         // Apply transformations
         this._applySettings(result.model, settings);
 
+        // Extract scene cameras (must run AFTER _applySettings so world matrices are correct)
+        this.sceneCameras = this._extractSceneCameras(result.model);
+        if (this.sceneCameras.length > 0) {
+            console.log(`[3D Viewer Pro] Found ${this.sceneCameras.length} scene camera(s):`,
+                this.sceneCameras.map(c => c.name));
+        }
+
         // Extract model info
         result.info = this._extractInfo(result.model);
+        result.sceneCameras = this.sceneCameras;
 
         this.loadedModel = result.model;
         this.animations = result.animations || [];
@@ -197,6 +206,27 @@ export class ModelLoader {
     }
 
     /**
+     * Extract scene cameras baked into the file (FBX / GLTF scenes from C4D, Blender, Maya, etc.)
+     * Must be called AFTER _applySettings() so world matrices reflect the centered/scaled scene.
+     */
+    _extractSceneCameras(model) {
+        const cameras = [];
+        model.traverse((child) => {
+            if (child.isCamera) {
+                // Force update so getWorldPosition/Quaternion are valid before the model
+                // is added to the Three.js scene in ViewerApp
+                child.updateWorldMatrix(true, false);
+                cameras.push({
+                    name: child.name && child.name.trim() ? child.name.trim() : `Camera ${cameras.length + 1}`,
+                    object: child,
+                    fov: child.isPerspectiveCamera ? child.fov : 50,
+                });
+            }
+        });
+        return cameras;
+    }
+
+    /**
      * Extract model metadata
      */
     _extractInfo(model) {
@@ -263,5 +293,6 @@ export class ModelLoader {
         this.loadedModel = null;
         this.animations = [];
         this.modelInfo = null;
+        this.sceneCameras = [];
     }
 }

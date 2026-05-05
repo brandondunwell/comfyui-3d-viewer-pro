@@ -95,8 +95,15 @@ export class ViewerApp {
 
         this.ui.on('renderMode', (mode) => this.setRenderMode(mode));
         this.ui.on('cameraPreset', (preset) => {
-            const box = this.modelLoader.getBoundingBox();
-            this.cameraController.setPreset(preset, box);
+            // Scene cameras embedded in the file use a 'scene_camera_N' prefix
+            if (preset.startsWith('scene_camera_')) {
+                const idx = parseInt(preset.replace('scene_camera_', ''), 10);
+                const cam = this.modelLoader.sceneCameras?.[idx];
+                if (cam) this.cameraController.applySceneCamera(cam.object);
+            } else {
+                const box = this.modelLoader.getBoundingBox();
+                this.cameraController.setPreset(preset, box);
+            }
         });
         this.ui.on('lightingPreset', (preset) => this.lightingManager.setPreset(preset));
         this.ui.on('toggleGrid', () => {
@@ -167,6 +174,16 @@ export class ViewerApp {
                 }
             } else {
                 if (this.ui) this.ui.hideAnimationControls();
+            }
+
+            // Populate scene cameras in the Camera dropdown if the file had any
+            if (this.ui) {
+                const sceneCams = this.modelLoader.sceneCameras;
+                if (sceneCams && sceneCams.length > 0) {
+                    this.ui.populateSceneCameras(sceneCams.map(c => c.name));
+                } else {
+                    this.ui.clearSceneCameras();
+                }
             }
 
             // Update UI info

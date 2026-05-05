@@ -28,6 +28,12 @@ Adjust the Focal Length (mm) and watch the lens compression update in real-time.
 
 https://github.com/user-attachments/assets/56e8b1b2-ea53-4d95-8e9a-446c7fee15c2
 
+### 📷 Embedded Scene Camera Snap
+Professional workflow support for cameras baked into **FBX** and **GLTF** files. 
+- **Auto-Extraction**: Automatically detects all cameras exported from Cinema 4D, Blender, Maya, and more.
+- **Precision Snap**: Snaps the viewport to the exact position, rotation, and FOV defined in your 3D software.
+- **Smart Aspect Ratio**: Automatically synchronizes node width/height to match the baked camera's aspect ratio for pixel-perfect framing.
+
 ### 🖼️ Professional Multi-Pass Rendering
 Generate up to 6 distinct feature maps from your 3D view in a single execution:
 1. **Color** - Full PBR lighting/texture render.
