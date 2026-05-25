@@ -398,11 +398,11 @@ class Viewer3D {
     _setupGroundPlane() {
         const geo = new THREE.PlaneGeometry(20, 20);
         const mat = new THREE.ShadowMaterial({ opacity: 0.25 });
-        const plane = new THREE.Mesh(geo, mat);
-        plane.rotation.x = -Math.PI / 2;
-        plane.position.y = -0.001;
-        plane.receiveShadow = true;
-        this.scene.add(plane);
+        this.groundPlane = new THREE.Mesh(geo, mat);
+        this.groundPlane.rotation.x = -Math.PI / 2;
+        this.groundPlane.position.y = -0.001;
+        this.groundPlane.receiveShadow = true;
+        this.scene.add(this.groundPlane);
     }
 
     _setupLighting(preset) {
@@ -1421,11 +1421,13 @@ async function performRenderSequence(request, node) {
         }
     }
 
-    // Temporarily hide UI helpers and Gizmos during render
+    // Temporarily hide UI helpers, ground plane, and Gizmos during render
     const showG = viewer.showGrid; const showA = viewer.showAxes;
+    const showGP = viewer.groundPlane ? viewer.groundPlane.visible : true;
     let gizmoState = false;
     let gizmoAttached = null;
     viewer.showGrid = false; viewer.showAxes = false;
+    if (viewer.groundPlane) viewer.groundPlane.visible = false;
     if (viewer.transformControls) {
         gizmoState = viewer.transformControls.enabled;
         gizmoAttached = viewer.transformControls.object;
@@ -1558,6 +1560,7 @@ async function performRenderSequence(request, node) {
     viewer._setupLighting(origLightRig);
     viewer.setRenderMode(originalMode);
     viewer.showGrid = showG; viewer.showAxes = showA;
+    if (viewer.groundPlane) viewer.groundPlane.visible = showGP;
     if (viewer.transformControls) {
         if (gizmoAttached) viewer.transformControls.attach(gizmoAttached);
         viewer.transformControls.enabled = gizmoState;
