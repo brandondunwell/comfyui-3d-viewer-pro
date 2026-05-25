@@ -12,8 +12,11 @@ input/3d/*
 !input/3d/.gitkeep
 temp/*
 
-# IDEs
+# IDEs and type configurations
 .vscode/
 .idea/
 *.swp
 *.swo
+pyrightconfig.json
+typings/
+

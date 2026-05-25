@@ -26,6 +26,7 @@ class AdvancedRenderPro:
                 "normal_bg": (bg_options, {"default": "Black"}),
                 "wireframe_bg": (bg_options, {"default": "Black"}),
                 "ao_bg": (bg_options, {"default": "Black"}),
+                "shading": (["Flat Base", "Selected Preset", "Unlit Albedo", "Studio Light", "Outdoor", "Dramatic", "Rim Peak"], {"default": "Flat Base"}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -45,7 +46,7 @@ class AdvancedRenderPro:
 
     def render_advanced(self, model3d, resolution=1024, 
                          color_bg="Original", depth_bg="Black", normal_bg="Black", 
-                         wireframe_bg="Black", ao_bg="Black", unique_id=None):
+                         wireframe_bg="Black", ao_bg="Black", shading="Flat Base", unique_id=None):
 
         out_temp_dir = folder_paths.get_temp_directory()
         os.makedirs(out_temp_dir, exist_ok=True)
@@ -58,6 +59,7 @@ class AdvancedRenderPro:
                 "output_dir": out_temp_dir,
                 "unique_id": unique_id,
                 "is_advanced": True, # Flag for JS to use pass_configs
+                "shading": shading,
                 "pass_configs": {
                     "color": {"bg": color_bg},
                     "depth": {"bg": depth_bg},

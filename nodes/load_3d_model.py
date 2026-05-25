@@ -50,6 +50,7 @@ class LoadAndPreview3DModelPro:
                 "width": ("INT", {"default": 1024, "min": 256, "max": 4096, "step": 64}),
                 "height": ("INT", {"default": 1024, "min": 256, "max": 4096, "step": 64}),
                 "bg_transparent": ("BOOLEAN", {"default": False}),
+                "shading": (["Flat Base", "Selected Preset", "Unlit Albedo", "Studio Light", "Outdoor", "Dramatic", "Rim Peak"], {"default": "Flat Base"}),
             },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
@@ -93,9 +94,11 @@ class LoadAndPreview3DModelPro:
 
     def load_and_preview(self, model_file, up_direction="Y", custom_path="",
                          scale=1.0, center_model=True, auto_scale=True,
-                         width=1024, height=1024, bg_transparent=False, unique_id=None):
+                         width=1024, height=1024, bg_transparent=False, shading="Flat Base", unique_id=None):
                          
         filepath = self._resolve_path(model_file, custom_path)
+        if filepath is None:
+            raise ValueError("No 3D model path resolved.")
         ext = os.path.splitext(filepath)[1].lower().lstrip(".")
         file_size = os.path.getsize(filepath)
 
@@ -150,6 +153,7 @@ class LoadAndPreview3DModelPro:
                 "width": width,
                 "height": height,
                 "bg_transparent": bg_transparent,
+                "shading": shading,
                 "output_dir": out_temp_dir,
                 "unique_id": unique_id,
             }
@@ -184,7 +188,7 @@ class LoadAndPreview3DModelPro:
 
         # Load the rendered pass images
         pass_names = ["color", "depth", "normal", "wireframe", "ao_silhouette", "mask"]
-        results = [model3d]
+        results: list = [model3d]
 
         for pass_name in pass_names:
             img_path = os.path.join(out_temp_dir, f"viewer3d_{unique_id}_{pass_name}.png")

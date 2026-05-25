@@ -33,8 +33,10 @@ class Turntable3DPro:
                 "pitch": ("FLOAT", {"default": 20.0, "min": -90.0, "max": 90.0, "step": 1.0,
                                     "tooltip": "Camera elevation angle in degrees"}),
                 "start_from_front_view": ("BOOLEAN", {"default": False, "tooltip": "Start from 0° (true) or current view (false)"}),
-                "render_mode": (["color", "normal", "depth", "wireframe", "matcap"],
+                "render_mode": (["color", "normal", "depth", "wireframe", "matcap", "albedo"],
                                {"default": "color", "tooltip": "Material pass to render"}),
+                "shading": (["Flat Base", "Selected Preset", "Unlit Albedo", "Studio Light", "Outdoor", "Dramatic", "Rim Peak"],
+                            {"default": "Flat Base", "tooltip": "Shading style for color render mode"}),
                 "bg_mode": (["Original", "Black", "White", "Transparent"],
                            {"default": "Original", "tooltip": "Background style"}),
             },
@@ -55,7 +57,7 @@ class Turntable3DPro:
 
     def render_turntable(self, model3d, num_frames=16, width=1024, height=1024,
                          pitch=20.0, start_from_front_view=False,
-                         render_mode="color", bg_mode="Original", unique_id=None):
+                         render_mode="color", shading="Flat Base", bg_mode="Original", unique_id=None):
         temp_dir = folder_paths.get_temp_directory()
         os.makedirs(temp_dir, exist_ok=True)
 
@@ -77,6 +79,7 @@ class Turntable3DPro:
                 "angle_offsets": angle_offsets,
                 "pitch": pitch,
                 "render_mode": render_mode,
+                "shading": shading,
                 "bg_mode": bg_mode,
                 "start_from_front_view": start_from_front_view,
                 "output_dir": temp_dir,

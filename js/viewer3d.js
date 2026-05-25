@@ -219,6 +219,69 @@ async function loadThreeJS() {
     }
 }
 
+function setupSceneLighting(scene, lightsArray, preset) {
+    // Remove old lights
+    lightsArray.forEach(l => { scene.remove(l); if (l.dispose) l.dispose(); });
+    lightsArray.length = 0;
+
+    const addLight = (light) => { scene.add(light); lightsArray.push(light); };
+
+    switch (preset) {
+        case 'studio':
+            addLight(new THREE.AmbientLight(0x404060, 0.4));
+            const key = new THREE.DirectionalLight(0xfff0e0, 1.2);
+            key.position.set(3, 5, 4);
+            key.castShadow = true;
+            key.shadow.mapSize.set(2048, 2048);
+            key.shadow.camera.near = 0.1; key.shadow.camera.far = 30;
+            key.shadow.camera.left = -5; key.shadow.camera.right = 5;
+            key.shadow.camera.top = 5; key.shadow.camera.bottom = -5;
+            key.shadow.bias = -0.0005;
+            addLight(key);
+            const fill = new THREE.DirectionalLight(0xc0d0ff, 0.5);
+            fill.position.set(-3, 2, 2);
+            addLight(fill);
+            const rim = new THREE.DirectionalLight(0xffffff, 0.3);
+            rim.position.set(0, 3, -4);
+            addLight(rim);
+            addLight(new THREE.HemisphereLight(0x8899bb, 0x445566, 0.3));
+            break;
+        case 'outdoor':
+            addLight(new THREE.AmbientLight(0x6688cc, 0.3));
+            const sun = new THREE.DirectionalLight(0xffeedd, 1.5);
+            sun.position.set(5, 8, 3); sun.castShadow = true;
+            sun.shadow.mapSize.set(2048, 2048);
+            addLight(sun);
+            addLight(new THREE.HemisphereLight(0x87ceeb, 0x362d1b, 0.6));
+            break;
+        case 'dramatic':
+            addLight(new THREE.AmbientLight(0x111122, 0.15));
+            const spot = new THREE.SpotLight(0xff9944, 2.0, 20, Math.PI/6, 0.5, 1);
+            spot.position.set(4, 4, 2); spot.castShadow = true;
+            addLight(spot);
+            const dRim = new THREE.DirectionalLight(0x4466ff, 0.8);
+            dRim.position.set(-3, 2, -3);
+            addLight(dRim);
+            break;
+        case 'flat':
+            addLight(new THREE.AmbientLight(0xffffff, 0.8));
+            addLight(new THREE.HemisphereLight(0xffffff, 0xcccccc, 0.5));
+            const front = new THREE.DirectionalLight(0xffffff, 0.3);
+            front.position.set(0, 2, 5);
+            addLight(front);
+            break;
+        case 'rim':
+            addLight(new THREE.AmbientLight(0x111133, 0.2));
+            [[0xff6644,-3,3,-3],[0x4488ff,3,3,-3],[0x44ff88,0,4,-2]].forEach(([c,x,y,z]) => {
+                const l = new THREE.DirectionalLight(c, 0.9);
+                l.position.set(x,y,z); addLight(l);
+            });
+            const fRim = new THREE.DirectionalLight(0x333344, 0.3);
+            fRim.position.set(0, 1, 4); addLight(fRim);
+            break;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  3D VIEWER CLASS — self-contained viewer
 // ═══════════════════════════════════════════════════════════════════════════
@@ -248,6 +311,7 @@ class Viewer3D {
         this.fpsTime = performance.now();
         this.fps = 0;
         this.sceneCameras = [];  // cameras baked into the loaded file
+        this.currentLightRig = 'studio';
     }
 
     async init() {
@@ -342,66 +406,8 @@ class Viewer3D {
     }
 
     _setupLighting(preset) {
-        // Remove old lights
-        this.lights.forEach(l => { this.scene.remove(l); if (l.dispose) l.dispose(); });
-        this.lights = [];
-
-        const addLight = (light) => { this.scene.add(light); this.lights.push(light); };
-
-        switch (preset) {
-            case 'studio':
-                addLight(new THREE.AmbientLight(0x404060, 0.4));
-                const key = new THREE.DirectionalLight(0xfff0e0, 1.2);
-                key.position.set(3, 5, 4);
-                key.castShadow = true;
-                key.shadow.mapSize.set(2048, 2048);
-                key.shadow.camera.near = 0.1; key.shadow.camera.far = 30;
-                key.shadow.camera.left = -5; key.shadow.camera.right = 5;
-                key.shadow.camera.top = 5; key.shadow.camera.bottom = -5;
-                key.shadow.bias = -0.0005;
-                addLight(key);
-                const fill = new THREE.DirectionalLight(0xc0d0ff, 0.5);
-                fill.position.set(-3, 2, 2);
-                addLight(fill);
-                const rim = new THREE.DirectionalLight(0xffffff, 0.3);
-                rim.position.set(0, 3, -4);
-                addLight(rim);
-                addLight(new THREE.HemisphereLight(0x8899bb, 0x445566, 0.3));
-                break;
-            case 'outdoor':
-                addLight(new THREE.AmbientLight(0x6688cc, 0.3));
-                const sun = new THREE.DirectionalLight(0xffeedd, 1.5);
-                sun.position.set(5, 8, 3); sun.castShadow = true;
-                sun.shadow.mapSize.set(2048, 2048);
-                addLight(sun);
-                addLight(new THREE.HemisphereLight(0x87ceeb, 0x362d1b, 0.6));
-                break;
-            case 'dramatic':
-                addLight(new THREE.AmbientLight(0x111122, 0.15));
-                const spot = new THREE.SpotLight(0xff9944, 2.0, 20, Math.PI/6, 0.5, 1);
-                spot.position.set(4, 4, 2); spot.castShadow = true;
-                addLight(spot);
-                const dRim = new THREE.DirectionalLight(0x4466ff, 0.8);
-                dRim.position.set(-3, 2, -3);
-                addLight(dRim);
-                break;
-            case 'flat':
-                addLight(new THREE.AmbientLight(0xffffff, 0.8));
-                addLight(new THREE.HemisphereLight(0xffffff, 0xcccccc, 0.5));
-                const front = new THREE.DirectionalLight(0xffffff, 0.3);
-                front.position.set(0, 2, 5);
-                addLight(front);
-                break;
-            case 'rim':
-                addLight(new THREE.AmbientLight(0x111133, 0.2));
-                [[0xff6644,-3,3,-3],[0x4488ff,3,3,-3],[0x44ff88,0,4,-2]].forEach(([c,x,y,z]) => {
-                    const l = new THREE.DirectionalLight(c, 0.9);
-                    l.position.set(x,y,z); addLight(l);
-                });
-                const fRim = new THREE.DirectionalLight(0x333344, 0.3);
-                fRim.position.set(0, 1, 4); addLight(fRim);
-                break;
-        }
+        this.currentLightRig = preset;
+        setupSceneLighting(this.scene, this.lights, preset);
     }
 
     async loadModel(url, format, settings = {}) {
@@ -585,6 +591,29 @@ class Viewer3D {
         this._saveMaterials();
         let mat;
         switch (mode) {
+            case 'albedo': {
+                this.model.traverse(c => {
+                    if (c.isMesh) {
+                        const origMat = this.savedMaterials.get(c.uuid) || c.material;
+                        const createBasicMat = (m) => {
+                            const basicMat = new THREE.MeshBasicMaterial();
+                            if (m.map) basicMat.map = m.map;
+                            if (m.color) basicMat.color.copy(m.color);
+                            basicMat.opacity = m.opacity;
+                            basicMat.transparent = m.transparent;
+                            basicMat.alphaTest = m.alphaTest;
+                            basicMat.side = m.side;
+                            return basicMat;
+                        };
+                        if (Array.isArray(origMat)) {
+                            c.material = origMat.map(m => createBasicMat(m));
+                        } else {
+                            c.material = createBasicMat(origMat);
+                        }
+                    }
+                });
+                break;
+            }
             case 'wireframe':
                 mat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, wireframe: true });
                 break;
@@ -865,6 +894,7 @@ function createViewerWidget(node) {
 
             <select data-action="mode" title="Render Material Pass">
                 <option value="color">Color</option>
+                <option value="albedo">Unlit / Albedo</option>
                 <option value="wireframe">Wireframe</option>
                 <option value="normal">Normal</option>
                 <option value="depth">Depth</option>
@@ -1378,9 +1408,8 @@ async function performRenderSequence(request, node) {
     const originalMode = viewer.renderMode;
     const origBackground = viewer.scene.background ? viewer.scene.background.clone() : null;
 
-    // Enforce flat rendering lighting for all outputs
+    // Keep track of original lighting preset
     const origLightRig = viewer.currentLightRig || 'studio';
-    viewer._setupLighting('flat');
 
     // Apply config settings to viewport for rendering
     if (!config.is_advanced) {
@@ -1426,7 +1455,22 @@ async function performRenderSequence(request, node) {
     for (const passName of passes) {
         try {
             // Set material for this pass
-            if (passName === "color") viewer.setRenderMode("color");
+            if (passName === "color") {
+                const shadingMode = config.shading || "Flat Base";
+                if (shadingMode === "Unlit Albedo") {
+                    viewer.setRenderMode("albedo");
+                } else {
+                    viewer.setRenderMode("color");
+                    let targetPreset = 'flat';
+                    if (shadingMode === "Selected Preset") targetPreset = origLightRig;
+                    else if (shadingMode === "Studio Light") targetPreset = 'studio';
+                    else if (shadingMode === "Outdoor") targetPreset = 'outdoor';
+                    else if (shadingMode === "Dramatic") targetPreset = 'dramatic';
+                    else if (shadingMode === "Rim Peak") targetPreset = 'rim';
+                    
+                    viewer._setupLighting(targetPreset);
+                }
+            }
             else if (passName === "depth") viewer.setRenderMode("depth");
             else if (passName === "normal") viewer.setRenderMode("normal");
             else if (passName === "wireframe") viewer.setRenderMode("wireframe");
@@ -1616,12 +1660,20 @@ async function performTurntableSequence(request, node) {
     // Add the existing model directly (shared reference — do NOT dispose)
     offScene.add(sourceViewer.model);
 
-    // Flat lighting for clean outputs
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
-    offScene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(5, 10, 7);
-    offScene.add(dirLight);
+    // Add lighting rig based on shadingMode (if not unlit/albedo)
+    const shadingMode = config.shading || 'Flat Base';
+    const useAlbedoOverride = (renderMode === 'albedo' || (renderMode === 'color' && shadingMode === 'Unlit Albedo'));
+    if (renderMode === 'color' && !useAlbedoOverride) {
+        let preset = 'flat';
+        if (shadingMode === 'Selected Preset') preset = sourceViewer.currentLightRig || 'studio';
+        else if (shadingMode === 'Studio Light') preset = 'studio';
+        else if (shadingMode === 'Outdoor') preset = 'outdoor';
+        else if (shadingMode === 'Dramatic') preset = 'dramatic';
+        else if (shadingMode === 'Rim Peak') preset = 'rim';
+        
+        const offLights = [];
+        setupSceneLighting(offScene, offLights, preset);
+    }
 
     // Camera
     const offCamera = new THREE.PerspectiveCamera(fov, outW / outH, 0.01, 1000);
@@ -1643,26 +1695,50 @@ async function performTurntableSequence(request, node) {
 
     // Apply material override if needed
     const savedMats = new Map();
-    if (renderMode !== 'color') {
+    if (renderMode !== 'color' || useAlbedoOverride) {
         sourceViewer.model.traverse(c => {
             if (c.isMesh) savedMats.set(c.uuid, c.material);
         });
-        let mat;
-        switch (renderMode) {
-            case 'normal': mat = new THREE.MeshNormalMaterial(); break;
-            case 'depth': mat = new THREE.ShaderMaterial({
-                vertexShader: `varying float vD; void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vD=-mv.z;gl_Position=projectionMatrix*mv;}`,
-                fragmentShader: `varying float vD;void main(){float d=clamp(1.0-(vD-0.1)/(20.0-0.1),0.0,1.0);gl_FragColor=vec4(vec3(d),1.0);}`,
-            }); break;
-            case 'wireframe': mat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, wireframe: true }); break;
-            case 'matcap': mat = new THREE.ShaderMaterial({
-                vertexShader: `varying vec3 vN,vV;void main(){vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.0);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}`,
-                fragmentShader: `varying vec3 vN,vV;void main(){vec3 n=normalize(vN);vec3 v=normalize(vV);float f=pow(1.0-max(dot(n,v),0.0),2.0);vec3 w=vec3(0.85,0.75,0.65),c=vec3(0.3,0.35,0.5);vec3 col=mix(w,c,f);float d=max(dot(n,normalize(vec3(0.5,1.0,0.3))),0.0);col*=0.5+0.5*d;gl_FragColor=vec4(col,1.0);}`,
-            }); break;
-            default: mat = null;
-        }
-        if (mat) {
-            sourceViewer.model.traverse(c => { if (c.isMesh) c.material = mat; });
+        
+        if (useAlbedoOverride) {
+            sourceViewer.model.traverse(c => {
+                if (c.isMesh) {
+                    const origMat = savedMats.get(c.uuid) || c.material;
+                    const createBasicMat = (m) => {
+                        const basicMat = new THREE.MeshBasicMaterial();
+                        if (m.map) basicMat.map = m.map;
+                        if (m.color) basicMat.color.copy(m.color);
+                        basicMat.opacity = m.opacity;
+                        basicMat.transparent = m.transparent;
+                        basicMat.alphaTest = m.alphaTest;
+                        basicMat.side = m.side;
+                        return basicMat;
+                    };
+                    if (Array.isArray(origMat)) {
+                        c.material = origMat.map(m => createBasicMat(m));
+                    } else {
+                        c.material = createBasicMat(origMat);
+                    }
+                }
+            });
+        } else {
+            let mat;
+            switch (renderMode) {
+                case 'normal': mat = new THREE.MeshNormalMaterial(); break;
+                case 'depth': mat = new THREE.ShaderMaterial({
+                    vertexShader: `varying float vD; void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vD=-mv.z;gl_Position=projectionMatrix*mv;}`,
+                    fragmentShader: `varying float vD;void main(){float d=clamp(1.0-(vD-0.1)/(20.0-0.1),0.0,1.0);gl_FragColor=vec4(vec3(d),1.0);}`,
+                }); break;
+                case 'wireframe': mat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, wireframe: true }); break;
+                case 'matcap': mat = new THREE.ShaderMaterial({
+                    vertexShader: `varying vec3 vN,vV;void main(){vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.0);vV=-mv.xyz;gl_Position=projectionMatrix*mv;}`,
+                    fragmentShader: `varying vec3 vN,vV;void main(){vec3 n=normalize(vN);vec3 v=normalize(vV);float f=pow(1.0-max(dot(n,v),0.0),2.0);vec3 w=vec3(0.85,0.75,0.65),c=vec3(0.3,0.35,0.5);vec3 col=mix(w,c,f);float d=max(dot(n,normalize(vec3(0.5,1.0,0.3))),0.0);col*=0.5+0.5*d;gl_FragColor=vec4(col,1.0);}`,
+                }); break;
+                default: mat = null;
+            }
+            if (mat) {
+                sourceViewer.model.traverse(c => { if (c.isMesh) c.material = mat; });
+            }
         }
     }
 
