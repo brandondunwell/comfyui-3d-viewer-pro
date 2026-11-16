@@ -34,6 +34,35 @@ Professional workflow support for cameras baked into **FBX** and **GLTF** files.
 - **Precision Snap**: Snaps the viewport to the exact position, rotation, and FOV defined in your 3D software.
 - **Smart Aspect Ratio**: Automatically synchronizes node width/height to match the baked camera's aspect ratio for pixel-perfect framing.
 
+### 🚶 First-Person Walkthrough Mode *(New)*
+Navigate architectural scenes and interiors like a first-person game — perfect for finding the ideal camera angle for AI image generation.
+
+**Controls:**
+| Key / Input | Action |
+|---|---|
+| `W / A / S / D` | Move forward / left / backward / right |
+| `Q / E` | Move down / up (elevation) |
+| `Shift` (hold) | Sprint (2.5× speed) |
+| `Scroll Wheel` | Adjust walk speed on the fly |
+| **Click canvas** | Lock mouse for free-look (Pointer Lock) |
+| **Right-click drag** | Look around without locking the mouse |
+| `Esc` | Release mouse lock |
+
+> Click the **🚶 Walk** button in the toolbar to enter Walk Mode. Click it again to return to standard Orbit mode. The camera position transfers smoothly between both modes.
+
+### 📐 Camera Inspector Panel *(New)*
+A floating panel (opened with the **📐 Cam** toolbar button) giving you precise, real-time control over the camera:
+
+- **XYZ Position** — Read and type exact coordinates to teleport the camera.
+- **Yaw & Pitch** — Numeric rotation inputs, live-synced while walking or orbiting.
+- **Eye Level Presets** — One-click buttons: 🧍 Stand (1.65 m), 🪑 Sit (1.15 m), 🐾 Ground (0.5 m), 🏠 High (3.5 m).
+- **Walk Speed Slider** — Adjust speed from 0.1 m/s (tight interiors) to 20 m/s (large outdoor scenes).
+- **Camera Bookmarks (Cam 1–4)** — Save up to 4 viewpoints and jump between them instantly:
+  - **`Shift + Click`** a bookmark button → saves current position, rotation & FOV.
+  - **`Click`** a saved bookmark → recalls that exact viewpoint.
+
+> This makes it easy to lock in multiple hero shots (e.g. living room, kitchen, bedroom) and render each one without re-navigating.
+
 ### 🖼️ Professional Multi-Pass Rendering
 Generate up to 6 distinct feature maps from your 3D view in a single execution:
 1. **Color** - Full PBR lighting/texture render.
@@ -62,6 +91,7 @@ Render full 360° spinning image batches automatically synced to your viewer's r
 - **RGBA Transparency** - Full support for transparent background renders with native Alpha channels.
 - **OS Scaling Fix** - Built-in bypass for Windows DPI scaling ensures your 1024x1024 render is *exactly* 1024x1024 pixels.
 - **Studio Sync** - Uploading a background to the main viewer automatically broadcasts the exact resolution to all Turntable nodes to maintain flawless aspect ratios.
+- **Walk ↔ Orbit Transition** - Switching between Walk and Orbit modes transfers the camera position seamlessly with zero snapping.
 
 ## 📦 Installation
 

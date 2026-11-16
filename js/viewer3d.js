@@ -126,6 +126,65 @@ const VIEWER_CSS = `
     background: rgba(13,17,23,0.95); color: #f85149; font-size: 11px;
     padding: 20px; text-align: center; flex-direction: column; gap: 8px;
 }
+/* ── Walk Mode ─────────────────────────────────────────────────────────── */
+.v3d-walk-active .v3d-canvas-wrap { cursor: crosshair !important; }
+.v3d-walk-hint {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    background: rgba(13,17,23,0.88); border: 1px solid rgba(88,166,255,0.4);
+    border-radius: 10px; padding: 16px 22px; color: #e6edf3; font-size: 11px;
+    text-align: center; z-index: 60; pointer-events: none; line-height: 1.8;
+    backdrop-filter: blur(8px);
+}
+.v3d-walk-hint strong { color: #58a6ff; }
+.v3d-walk-btn-active { background: rgba(63,185,80,0.25) !important; border-color: #3fb950 !important; color: #3fb950 !important; }
+/* ── Camera Inspector Panel ─────────────────────────────────────────────── */
+.v3d-cam-panel {
+    position: absolute; top: 52px; right: 10px; z-index: 30;
+    background: rgba(13,17,23,0.92); backdrop-filter: blur(10px);
+    border: 1px solid rgba(88,166,255,0.2); border-radius: 10px;
+    padding: 10px 12px; min-width: 220px; display: none;
+    font-size: 11px; font-family: 'SF Mono','Cascadia Code',monospace;
+    color: #c9d1d9; gap: 6px; flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.v3d-cam-panel.open { display: flex; }
+.v3d-cam-panel h4 {
+    margin: 0 0 4px 0; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+    color: #58a6ff; text-transform: uppercase; border-bottom: 1px solid rgba(88,166,255,0.15); padding-bottom: 5px;
+}
+.v3d-cam-row { display: flex; align-items: center; gap: 5px; margin-bottom: 1px; }
+.v3d-cam-row label { width: 42px; font-size: 10px; color: #8b949e; flex-shrink: 0; }
+.v3d-cam-row input[type="number"] {
+    flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(139,148,158,0.25);
+    border-radius: 4px; color: #e6edf3; font-size: 10px; font-family: inherit;
+    padding: 3px 5px; outline: none; min-width: 0;
+}
+.v3d-cam-row input[type="number"]:focus { border-color: #58a6ff; }
+.v3d-cam-row input[type="range"] {
+    flex: 1; -webkit-appearance: none; height: 3px; background: rgba(88,166,255,0.25);
+    border-radius: 2px; cursor: pointer; outline: none; border: none;
+}
+.v3d-cam-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%;
+    background: #58a6ff; cursor: pointer;
+}
+.v3d-cam-section { font-size: 9px; font-weight: 700; color: #58a6ff; letter-spacing: 0.08em; margin-top: 4px; text-transform: uppercase; }
+.v3d-cam-eyebtns { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0; }
+.v3d-cam-eyebtns button {
+    flex: 1; background: #21262d; border: 1px solid rgba(139,148,158,0.25); border-radius: 5px;
+    color: #c9d1d9; font-size: 9px; padding: 3px 4px; cursor: pointer; white-space: nowrap;
+    transition: all 0.15s;
+}
+.v3d-cam-eyebtns button:hover { background: rgba(88,166,255,0.2); border-color: #58a6ff; color: #58a6ff; }
+.v3d-cam-bookmark-row { display: flex; gap: 4px; }
+.v3d-cam-bookmark-row button {
+    flex: 1; background: #21262d; border: 1px solid rgba(139,148,158,0.2); border-radius: 5px;
+    color: #c9d1d9; font-size: 9px; padding: 4px 2px; cursor: pointer; transition: all 0.15s;
+}
+.v3d-cam-bookmark-row button:hover { background: rgba(88,166,255,0.15); border-color: #58a6ff; }
+.v3d-cam-bookmark-row button.saved { border-color: #3fb950; color: #3fb950; }
+.v3d-walk-speed-row { display: flex; align-items: center; gap: 5px; }
+.v3d-walk-speed-row label { width: 42px; font-size: 10px; color: #8b949e; flex-shrink: 0; }
 `;
 
 function injectCSS() {
@@ -741,13 +800,25 @@ class Viewer3D {
 
     _animate() {
         this.animId = requestAnimationFrame(() => this._animate());
+
+        // Delta time for FPS controller (capped at 100ms to avoid huge jumps after tab focus)
+        const now = performance.now();
+        const dt  = Math.min((now - (this._lastFrameTime || now)) / 1000, 0.1);
+        this._lastFrameTime = now;
+
         if (this.mixer) this.mixer.update(this.clock.getDelta());
-        this.controls.update();
+
+        // FPS controller takes precedence when active; OrbitControls otherwise
+        if (this.fpsController && this.fpsController.enabled) {
+            this.fpsController.update(dt);
+        } else {
+            this.controls.update();
+        }
+
         this.renderer.render(this.scene, this.camera);
 
-        // FPS
+        // FPS counter
         this.fpsFrames++;
-        const now = performance.now();
         if (now - this.fpsTime >= 1000) {
             this.fps = Math.round(this.fpsFrames * 1000 / (now - this.fpsTime));
             this.fpsFrames = 0;
@@ -757,11 +828,263 @@ class Viewer3D {
 
     dispose() {
         if (this.animId) cancelAnimationFrame(this.animId);
+        this.fpsController?.dispose();
         this.controls?.dispose();
         this.renderer?.dispose();
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  FIRST-PERSON CONTROLLER — WASD + Mouse Look + Camera Inspector
+// ═══════════════════════════════════════════════════════════════════════════
+class FirstPersonController {
+    constructor(camera, domElement) {
+        this.camera    = camera;
+        this.dom       = domElement;
+        this.enabled   = false;
+
+        // Movement
+        this.speed        = 2.0;      // m/s
+        this.sprintMult   = 2.5;
+        this._keys        = {};       // key → true while held
+        this._vel         = { x: 0, y: 0, z: 0 };
+        this._friction    = 0.88;     // per-frame damping (applied before accel)
+
+        // Look (pitch/yaw stored separately to avoid gimbal lock)
+        this._yaw   = 0;  // radians – left/right
+        this._pitch = 0;  // radians – up/down  (clamped ±89°)
+
+        // Pointer Lock state
+        this._pointerLocked = false;
+
+        // Right-click drag fallback
+        this._rmb       = false;
+        this._lastX     = 0;
+        this._lastY     = 0;
+        this.mouseSens  = 0.0018; // radians per pixel
+
+        // Bookmarks  { slot: { position, yaw, pitch } }
+        this._bookmarks = {};
+
+        // Bound listener refs (for safe removal)
+        this._onKeyDown        = this._onKeyDown.bind(this);
+        this._onKeyUp          = this._onKeyUp.bind(this);
+        this._onMouseDown      = this._onMouseDown.bind(this);
+        this._onMouseUp        = this._onMouseUp.bind(this);
+        this._onMouseMove      = this._onMouseMove.bind(this);
+        this._onWheel          = this._onWheel.bind(this);
+        this._onPointerLockChg = this._onPointerLockChg.bind(this);
+        this._onPointerLockErr = this._onPointerLockErr.bind(this);
+    }
+
+    // ── Activation / Deactivation ───────────────────────────────────────────
+    activate() {
+        if (this.enabled) return;
+        this.enabled = true;
+
+        // Derive yaw/pitch from current camera quaternion so the view doesn't snap
+        const euler = new THREE.Euler();
+        euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
+        this._yaw   = euler.y;
+        this._pitch = euler.x;
+
+        window.addEventListener('keydown', this._onKeyDown, { capture: true });
+        window.addEventListener('keyup',   this._onKeyUp,   { capture: true });
+        this.dom.addEventListener('mousedown',  this._onMouseDown);
+        this.dom.addEventListener('mouseup',    this._onMouseUp);
+        this.dom.addEventListener('mousemove',  this._onMouseMove);
+        this.dom.addEventListener('wheel',      this._onWheel, { passive: false });
+        document.addEventListener('pointerlockchange', this._onPointerLockChg);
+        document.addEventListener('pointerlockerror',  this._onPointerLockErr);
+
+        // Single-click on canvas = request pointer lock
+        this._clickHandler = () => {
+            if (!this._pointerLocked) {
+                this.dom.requestPointerLock();
+            }
+        };
+        this.dom.addEventListener('click', this._clickHandler);
+    }
+
+    deactivate() {
+        if (!this.enabled) return;
+        this.enabled = false;
+        this._keys   = {};
+        this._rmb    = false;
+
+        if (this._pointerLocked) document.exitPointerLock();
+
+        window.removeEventListener('keydown', this._onKeyDown, { capture: true });
+        window.removeEventListener('keyup',   this._onKeyUp,   { capture: true });
+        this.dom.removeEventListener('mousedown',  this._onMouseDown);
+        this.dom.removeEventListener('mouseup',    this._onMouseUp);
+        this.dom.removeEventListener('mousemove',  this._onMouseMove);
+        this.dom.removeEventListener('wheel',      this._onWheel);
+        document.removeEventListener('pointerlockchange', this._onPointerLockChg);
+        document.removeEventListener('pointerlockerror',  this._onPointerLockErr);
+        if (this._clickHandler) this.dom.removeEventListener('click', this._clickHandler);
+    }
+
+    // ── Event Handlers ──────────────────────────────────────────────────────
+    _shouldBlockKey(e) {
+        // Block ComfyUI / LiteGraph shortcuts only while walk mode is active
+        const blocked = ['w','a','s','d','q','e',' ','c','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+        return blocked.includes(e.key) || blocked.includes(e.key.toLowerCase());
+    }
+
+    _onKeyDown(e) {
+        if (!this.enabled) return;
+        if (this._shouldBlockKey(e)) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        this._keys[e.code] = true;
+    }
+
+    _onKeyUp(e) {
+        if (!this.enabled) return;
+        if (this._shouldBlockKey(e)) {
+            e.stopPropagation();
+        }
+        this._keys[e.code] = false;
+    }
+
+    _onMouseDown(e) {
+        if (!this.enabled) return;
+        if (e.button === 2) { this._rmb = true; this._lastX = e.clientX; this._lastY = e.clientY; e.preventDefault(); }
+    }
+
+    _onMouseUp(e) {
+        if (e.button === 2) this._rmb = false;
+    }
+
+    _onMouseMove(e) {
+        if (!this.enabled) return;
+        let dx = 0, dy = 0;
+        if (this._pointerLocked) {
+            dx = e.movementX || 0;
+            dy = e.movementY || 0;
+        } else if (this._rmb) {
+            dx = e.clientX - this._lastX;
+            dy = e.clientY - this._lastY;
+            this._lastX = e.clientX;
+            this._lastY = e.clientY;
+        } else { return; }
+
+        this._yaw   -= dx * this.mouseSens;
+        this._pitch -= dy * this.mouseSens;
+        const limit  = Math.PI / 2 - 0.01;
+        this._pitch  = Math.max(-limit, Math.min(limit, this._pitch));
+        this._applyRotation();
+    }
+
+    _onWheel(e) {
+        if (!this.enabled) return;
+        e.preventDefault();
+        // Scroll up = faster, scroll down = slower
+        const delta = e.deltaY > 0 ? -0.15 : 0.15;
+        this.speed  = Math.max(0.1, Math.min(20, this.speed * (1 + delta)));
+        // Dispatch custom event so the speed slider in the inspector can sync
+        this.dom.dispatchEvent(new CustomEvent('v3d-speed-change', { detail: { speed: this.speed }, bubbles: true }));
+    }
+
+    _onPointerLockChg() {
+        this._pointerLocked = (document.pointerLockElement === this.dom);
+    }
+
+    _onPointerLockErr() {
+        console.warn('[3D Viewer Pro] Pointer lock request was denied by browser.');
+    }
+
+    // ── Core: apply camera rotation from yaw/pitch ───────────────────────────
+    _applyRotation() {
+        const euler = new THREE.Euler(this._pitch, this._yaw, 0, 'YXZ');
+        this.camera.quaternion.setFromEuler(euler);
+    }
+
+    // ── Core: update per animation frame ────────────────────────────────────
+    update(dt) {
+        if (!this.enabled) return;
+
+        const isSprint = this._keys['ShiftLeft'] || this._keys['ShiftRight'];
+        const sp       = this.speed * (isSprint ? this.sprintMult : 1.0);
+
+        // Build movement input vector (local space)
+        let fx = 0, fy = 0, fz = 0;
+        if (this._keys['KeyW'] || this._keys['ArrowUp'])    fz += 1;
+        if (this._keys['KeyS'] || this._keys['ArrowDown'])  fz -= 1;
+        if (this._keys['KeyA'] || this._keys['ArrowLeft'])  fx -= 1;
+        if (this._keys['KeyD'] || this._keys['ArrowRight']) fx += 1;
+        if (this._keys['KeyE'] || this._keys['Space'])      fy += 1;
+        if (this._keys['KeyQ'] || this._keys['KeyC'])       fy -= 1;
+
+        // Normalize diagonal to prevent speed boost on diagonals
+        const len = Math.sqrt(fx*fx + fy*fy + fz*fz);
+        if (len > 0) { fx /= len; fy /= len; fz /= len; }
+
+        // Forward/right vectors from camera – projected to XZ plane so the
+        // player doesn't fly when looking up/down
+        const fwd   = new THREE.Vector3(-Math.sin(this._yaw), 0, -Math.cos(this._yaw));
+        const right = new THREE.Vector3(Math.cos(this._yaw),  0, -Math.sin(this._yaw));
+
+        const target_x = (fwd.x * fz + right.x * fx) * sp;
+        const target_y = fy * sp;
+        const target_z = (fwd.z * fz + right.z * fx) * sp;
+
+        // Smooth: lerp velocity toward target, apply friction
+        const lerp = 1 - Math.pow(1 - 0.18, dt * 60);
+        this._vel.x += (target_x - this._vel.x) * lerp;
+        this._vel.y += (target_y - this._vel.y) * lerp;
+        this._vel.z += (target_z - this._vel.z) * lerp;
+
+        this.camera.position.x += this._vel.x * dt;
+        this._vel.x            *= this._friction;
+        this.camera.position.y += this._vel.y * dt;
+        this._vel.y            *= this._friction;
+        this.camera.position.z += this._vel.z * dt;
+        this._vel.z            *= this._friction;
+    }
+
+    // ── Bookmarks ────────────────────────────────────────────────────────────
+    saveBookmark(slot) {
+        this._bookmarks[slot] = {
+            position: this.camera.position.clone(),
+            yaw:      this._yaw,
+            pitch:    this._pitch,
+            fov:      this.camera.fov,
+        };
+    }
+
+    loadBookmark(slot) {
+        const bk = this._bookmarks[slot];
+        if (!bk) return false;
+        this.camera.position.copy(bk.position);
+        this._yaw   = bk.yaw;
+        this._pitch = bk.pitch;
+        this._applyRotation();
+        if (this.camera.isPerspectiveCamera && bk.fov) {
+            this.camera.fov = bk.fov;
+            this.camera.updateProjectionMatrix();
+        }
+        return true;
+    }
+
+    hasBookmark(slot) { return !!this._bookmarks[slot]; }
+
+    // ── Utility: set absolute position / orientation ─────────────────────────
+    setPosition(x, y, z) {
+        this.camera.position.set(x, y, z);
+        this._vel = { x: 0, y: 0, z: 0 };
+    }
+
+    setYaw(deg)   { this._yaw   = THREE.MathUtils.degToRad(deg);  this._applyRotation(); }
+    setPitch(deg) { this._pitch = THREE.MathUtils.degToRad(deg);  this._applyRotation(); }
+
+    getYawDeg()   { return THREE.MathUtils.radToDeg(this._yaw);   }
+    getPitchDeg() { return THREE.MathUtils.radToDeg(this._pitch);  }
+
+    dispose() { this.deactivate(); }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  COMFYUI EXTENSION — node interception and widget creation
@@ -942,7 +1265,52 @@ function createViewerWidget(node) {
                 <button data-action="axes" title="Toggle World Axes">⊹</button>
                 <button data-action="fit" title="Recenter Camera (Fit)">🄵</button>
             </div>
+
+            <div class="v3d-toolbar-group">
+                <button data-action="walk" title="First-Person Walkthrough Mode (WASD + Mouse)">🚶 Walk</button>
+                <button data-action="cam-panel" title="Camera Inspector: Position, Rotation, FOV, Bookmarks">📐 Cam</button>
+            </div>
         </div>
+
+        <div class="v3d-cam-panel" data-panel="cam">
+            <h4>📐 Camera Inspector</h4>
+
+            <div class="v3d-cam-section">Position</div>
+            <div class="v3d-cam-row"><label>X</label><input type="number" data-cam="pos-x" step="0.01"></div>
+            <div class="v3d-cam-row"><label>Y</label><input type="number" data-cam="pos-y" step="0.01"></div>
+            <div class="v3d-cam-row"><label>Z</label><input type="number" data-cam="pos-z" step="0.01"></div>
+
+            <div class="v3d-cam-section" style="margin-top:6px;">Rotation</div>
+            <div class="v3d-cam-row"><label>Yaw °</label><input type="number" data-cam="yaw" step="0.5"></div>
+            <div class="v3d-cam-row"><label>Pitch °</label><input type="number" data-cam="pitch" step="0.5"></div>
+
+            <div class="v3d-cam-section" style="margin-top:6px;">Eye Level</div>
+            <div class="v3d-cam-eyebtns">
+                <button data-eye="1.65" title="Standing eye height">🧍 Stand</button>
+                <button data-eye="1.15" title="Seated eye height">🪑 Sit</button>
+                <button data-eye="0.5"  title="Ground level">🐾 Gnd</button>
+                <button data-eye="3.5"  title="Aerial / Mezzanine">🏠 High</button>
+            </div>
+
+            <div class="v3d-cam-section" style="margin-top:6px;">Walk Speed</div>
+            <div class="v3d-cam-row">
+                <label>Speed</label>
+                <input type="range" data-cam="speed" min="0.1" max="20" step="0.05" value="2">
+                <input type="number" data-cam="speed-num" min="0.1" max="20" step="0.1" value="2" style="width:42px;">
+            </div>
+
+            <div class="v3d-cam-section" style="margin-top:6px;">Bookmarks</div>
+            <div class="v3d-cam-bookmark-row">
+                <button data-bookmark="1">Cam 1</button>
+                <button data-bookmark="2">Cam 2</button>
+                <button data-bookmark="3">Cam 3</button>
+                <button data-bookmark="4">Cam 4</button>
+            </div>
+            <div style="font-size:9px;color:#8b949e;margin-top:4px;line-height:1.5;">
+                <strong style="color:#58a6ff;">Shift+Click</strong> to save · <strong style="color:#58a6ff;">Click</strong> to recall
+            </div>
+        </div>
+
         <div class="v3d-canvas-wrap" style="width:100%;height:400px;"></div>
         <div class="v3d-status">
             <span data-info="verts">Verts: —</span>
@@ -1258,6 +1626,214 @@ function createViewerWidget(node) {
         };
         inp.click();
     };
+
+    // ── Walk Mode ───────────────────────────────────────────────────────────
+    const walkBtn     = container.querySelector('[data-action="walk"]');
+    const camPanelBtn = container.querySelector('[data-action="cam-panel"]');
+    const camPanel    = container.querySelector('[data-panel="cam"]');
+
+    // Helper: enter walk mode
+    function enterWalkMode() {
+        const viewer = node._v3dViewer;
+        if (!viewer) return;
+
+        // Create FPS controller if not yet done
+        if (!viewer.fpsController) {
+            viewer.fpsController = new FirstPersonController(viewer.camera, viewer.renderer.domElement);
+        }
+
+        // Disable OrbitControls so they don't fight
+        viewer.controls.enabled = false;
+        viewer.fpsController.activate();
+
+        container.classList.add('v3d-walk-active');
+        walkBtn.classList.add('v3d-walk-btn-active');
+        walkBtn.title = 'Exit Walk Mode (Orbit)';
+
+        // Show hint overlay (auto-dismiss on first pointer lock)
+        let hint = container.querySelector('.v3d-walk-hint');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.className = 'v3d-walk-hint';
+            hint.innerHTML = `<strong>🚶 Walk Mode Active</strong><br>
+Click canvas to lock mouse (look around freely)<br>
+<strong>WASD</strong> move · <strong>Q/E</strong> up/down · <strong>Shift</strong> sprint<br>
+Right-click drag = look without locking<br>
+<strong>Scroll wheel</strong> = adjust speed<br>
+<strong>📐 Cam panel</strong> → Shift+Click bookmark to save · Click to recall<br>
+Press <strong>[Walk]</strong> again to return to Orbit`;
+            container.appendChild(hint);
+        }
+        hint.style.display = 'block';
+
+        // Hide hint only when user clicks the canvas (gives time to read instructions)
+        viewer.renderer.domElement.addEventListener('click', () => {
+            if (hint) hint.style.display = 'none';
+        }, { once: true });
+    }
+
+    // Helper: exit walk mode
+    function exitWalkMode() {
+        const viewer = node._v3dViewer;
+        if (!viewer || !viewer.fpsController) return;
+
+        viewer.fpsController.deactivate();
+
+        // Hand control back to OrbitControls: set a sensible orbit target ahead of camera
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(viewer.camera.quaternion);
+        viewer.controls.target.copy(viewer.camera.position).addScaledVector(fwd, 2.0);
+        viewer.controls.enabled = true;
+        viewer.controls.update();
+
+        container.classList.remove('v3d-walk-active');
+        walkBtn.classList.remove('v3d-walk-btn-active');
+        walkBtn.title = 'First-Person Walkthrough Mode (WASD + Mouse)';
+        const hint = container.querySelector('.v3d-walk-hint');
+        if (hint) hint.style.display = 'none';
+    }
+
+    walkBtn.onclick = () => {
+        const viewer = node._v3dViewer;
+        if (!viewer) return;
+        if (!viewer.fpsController || !viewer.fpsController.enabled) {
+            enterWalkMode();
+        } else {
+            exitWalkMode();
+        }
+    };
+
+    // ── Camera Inspector Panel ───────────────────────────────────────────────
+    camPanelBtn.onclick = () => {
+        camPanel.classList.toggle('open');
+    };
+
+    // Live-update inspector fields while camera moves
+    setInterval(() => {
+        const viewer = node._v3dViewer;
+        if (!viewer || !camPanel.classList.contains('open')) return;
+        const cam = viewer.camera;
+
+        // Position (round to 3dp for readability)
+        const setIfNotFocused = (sel, val) => {
+            const el = camPanel.querySelector(sel);
+            if (el && document.activeElement !== el) el.value = val;
+        };
+        setIfNotFocused('[data-cam="pos-x"]', cam.position.x.toFixed(3));
+        setIfNotFocused('[data-cam="pos-y"]', cam.position.y.toFixed(3));
+        setIfNotFocused('[data-cam="pos-z"]', cam.position.z.toFixed(3));
+
+        // Rotation (derive yaw/pitch from quaternion)
+        const euler = new THREE.Euler();
+        euler.setFromQuaternion(cam.quaternion, 'YXZ');
+        const yawDeg   = THREE.MathUtils.radToDeg(euler.y);
+        const pitchDeg = THREE.MathUtils.radToDeg(euler.x);
+        setIfNotFocused('[data-cam="yaw"]',   yawDeg.toFixed(1));
+        setIfNotFocused('[data-cam="pitch"]', pitchDeg.toFixed(1));
+
+        // Walk speed (from fps controller if active)
+        if (viewer.fpsController) {
+            setIfNotFocused('[data-cam="speed"]',     viewer.fpsController.speed.toFixed(2));
+            setIfNotFocused('[data-cam="speed-num"]', viewer.fpsController.speed.toFixed(2));
+        }
+    }, 100);
+
+    // Inspector -> Camera: position inputs
+    ['pos-x','pos-y','pos-z'].forEach(key => {
+        const el = camPanel.querySelector(`[data-cam="${key}"]`);
+        if (!el) return;
+        el.addEventListener('change', () => {
+            const viewer = node._v3dViewer;
+            if (!viewer) return;
+            const val = parseFloat(el.value);
+            if (isNaN(val)) return;
+            if (key === 'pos-x') viewer.camera.position.x = val;
+            if (key === 'pos-y') viewer.camera.position.y = val;
+            if (key === 'pos-z') viewer.camera.position.z = val;
+            if (viewer.fpsController?.enabled) {
+                viewer.fpsController._vel = { x: 0, y: 0, z: 0 };
+            } else {
+                viewer.controls.update();
+            }
+        });
+    });
+
+    // Inspector -> Camera: yaw / pitch inputs
+    const yawInput   = camPanel.querySelector('[data-cam="yaw"]');
+    const pitchInput = camPanel.querySelector('[data-cam="pitch"]');
+    const applyYawPitch = () => {
+        const viewer = node._v3dViewer;
+        if (!viewer) return;
+        const yaw   = parseFloat(yawInput.value)   || 0;
+        const pitch = parseFloat(pitchInput.value) || 0;
+        const euler = new THREE.Euler(
+            THREE.MathUtils.degToRad(pitch),
+            THREE.MathUtils.degToRad(yaw),
+            0, 'YXZ'
+        );
+        viewer.camera.quaternion.setFromEuler(euler);
+        // Keep FPS controller in sync if active
+        if (viewer.fpsController?.enabled) {
+            viewer.fpsController._yaw   = THREE.MathUtils.degToRad(yaw);
+            viewer.fpsController._pitch = THREE.MathUtils.degToRad(pitch);
+        }
+    };
+    if (yawInput)   yawInput.addEventListener('change',   applyYawPitch);
+    if (pitchInput) pitchInput.addEventListener('change', applyYawPitch);
+
+    // Inspector: speed slider + number sync
+    const speedRange = camPanel.querySelector('[data-cam="speed"]');
+    const speedNum   = camPanel.querySelector('[data-cam="speed-num"]');
+    const syncSpeed  = (val) => {
+        val = Math.max(0.1, Math.min(20, parseFloat(val) || 2));
+        if (speedRange) speedRange.value = val;
+        if (speedNum)   speedNum.value   = val.toFixed(2);
+        const viewer = node._v3dViewer;
+        if (viewer?.fpsController) viewer.fpsController.speed = val;
+    };
+    if (speedRange) speedRange.addEventListener('input',  (e) => syncSpeed(e.target.value));
+    if (speedNum)   speedNum.addEventListener('change',   (e) => syncSpeed(e.target.value));
+
+    // Sync speed from mouse wheel scroll (dispatched by FPS controller)
+    container.addEventListener('v3d-speed-change', (e) => syncSpeed(e.detail.speed));
+
+    // Inspector: eye-level preset buttons
+    camPanel.querySelectorAll('[data-eye]').forEach(btn => {
+        btn.onclick = () => {
+            const viewer = node._v3dViewer;
+            if (!viewer) return;
+            const eyeH = parseFloat(btn.dataset.eye);
+            viewer.camera.position.y = eyeH;
+            if (viewer.fpsController?.enabled) viewer.fpsController._vel.y = 0;
+        };
+    });
+
+    // Inspector: camera bookmark buttons  (click = recall / shift+click = save)
+    camPanel.querySelectorAll('[data-bookmark]').forEach(btn => {
+        const slot = btn.dataset.bookmark;
+        btn.onclick = (e) => {
+            const viewer = node._v3dViewer;
+            if (!viewer) return;
+            const fps = viewer.fpsController || (viewer.fpsController = new FirstPersonController(viewer.camera, viewer.renderer.domElement));
+            if (e.shiftKey) {
+                // Shift-click: SAVE bookmark
+                fps.saveBookmark(slot);
+                btn.classList.add('saved');
+                btn.textContent = `✅ ${slot}`;
+                setTimeout(() => {
+                    btn.textContent = `Cam ${slot}`;
+                }, 1200);
+            } else {
+                // Normal click: RECALL bookmark
+                if (fps.hasBookmark(slot)) {
+                    fps.loadBookmark(slot);
+                } else {
+                    btn.textContent = '(empty)';
+                    setTimeout(() => { btn.textContent = `Cam ${slot}`; }, 1000);
+                }
+            }
+        };
+        btn.title = `Click to recall · Shift+Click to save viewpoint ${slot}`;
+    });
 
     // Update status periodically
     setInterval(() => {
